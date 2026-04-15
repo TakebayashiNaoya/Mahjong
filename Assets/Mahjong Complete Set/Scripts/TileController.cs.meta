@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 30f20d8f4069e1d4884205b92857a258
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 149329
+  packageName: Mahjong Complete Set
+  packageVersion: 1.0
+  assetPath: Assets/Mahjong Complete Set/Scripts/TileController.cs
+  uploadId: 318924
