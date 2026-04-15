@@ -32,3 +32,10 @@ sysinfo.txt
 .vs
 Release/
 Debug/
+
+# Logs
+/[Ll]ogs/
+/[Ll]og/
+
+# User Settings
+/[Uu]ser[Ss]ettings/
