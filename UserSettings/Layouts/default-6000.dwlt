@@ -271,8 +271,8 @@ MonoBehaviour:
     y: 0
     width: 266.4
     height: 490.4
-  m_MinSize: {x: 200, y: 200}
-  m_MaxSize: {x: 4000, y: 4000}
+  m_MinSize: {x: 202, y: 226}
+  m_MaxSize: {x: 4002, y: 4026}
   m_ActualView: {fileID: 17}
   m_Panes:
   - {fileID: 17}
@@ -323,8 +323,8 @@ MonoBehaviour:
     y: 0
     width: 606.4
     height: 376.8
-  m_MinSize: {x: 200, y: 200}
-  m_MaxSize: {x: 4000, y: 4000}
+  m_MinSize: {x: 201, y: 226}
+  m_MaxSize: {x: 4001, y: 4026}
   m_ActualView: {fileID: 21}
   m_Panes:
   - {fileID: 21}
@@ -377,10 +377,10 @@ MonoBehaviour:
     m_TextWithWhitespace: "\u30B3\u30F3\u30BD\u30FC\u30EB\u200B"
   m_Pos:
     serializedVersion: 2
-    x: 606.4
-    y: 560.8
+    x: 1
+    y: 514.4
     width: 599.6
-    height: 218.80002
+    height: 218.79999
   m_SerializedDataModeController:
     m_DataMode: 0
     m_PreferredDataMode: 0
@@ -416,7 +416,7 @@ MonoBehaviour:
   m_Pos:
     serializedVersion: 2
     x: 0
-    y: 34.4
+    y: 0
     width: 1536
     height: 36
   m_SerializedDataModeController:
@@ -681,8 +681,8 @@ MonoBehaviour:
     m_TextWithWhitespace: "\u30D2\u30A8\u30E9\u30EB\u30AD\u30FC\u200B"
   m_Pos:
     serializedVersion: 2
-    x: 606.4
-    y: 70.4
+    x: 1
+    y: 24
     width: 264.4
     height: 464.4
   m_SerializedDataModeController:
@@ -752,8 +752,8 @@ MonoBehaviour:
     m_TextWithWhitespace: "\u30A4\u30F3\u30B9\u30DA\u30AF\u30BF\u30FC\u200B"
   m_Pos:
     serializedVersion: 2
-    x: 1208
-    y: 70.4
+    x: 1209
+    y: 24
     width: 327
     height: 709.2
   m_SerializedDataModeController:
@@ -803,8 +803,8 @@ MonoBehaviour:
     m_TextWithWhitespace: "\u30D7\u30ED\u30B8\u30A7\u30AF\u30C8\u200B"
   m_Pos:
     serializedVersion: 2
-    x: 872.8
-    y: 70.4
+    x: 267.4
+    y: 24
     width: 333.19998
     height: 464.4
   m_SerializedDataModeController:
@@ -855,8 +855,7 @@ MonoBehaviour:
       m_Data: 46880
     m_ExpandedIDs:
     - m_Data: 0
-    - m_Data: 45716
-    - m_Data: 1000000000
+    - m_Data: 46448
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -889,7 +888,7 @@ MonoBehaviour:
       m_Data: 0
     m_ExpandedIDs:
     - m_Data: 0
-    - m_Data: 45716
+    - m_Data: 46448
     m_RenameOverlay:
       m_UserAcceptedRename: 0
       m_Name: 
@@ -971,7 +970,7 @@ MonoBehaviour:
   m_Pos:
     serializedVersion: 2
     x: 0
-    y: 447.2
+    y: 400.8
     width: 605.4
     height: 332.40002
   m_SerializedDataModeController:
@@ -1045,7 +1044,7 @@ MonoBehaviour:
       height: 864.00006
     m_MinimalGUI: 1
   m_defaultScale: 0.36041668
-  m_LastWindowPixelSize: {x: 756.75, y: 415.50003}
+  m_LastWindowPixelSize: {x: 605.4, y: 332.40002}
   m_ClearInEditMode: 1
   m_NoCameraWarning: 1
   m_LowResolutionForAspectRatios: 00000000000000000000
@@ -1074,7 +1073,7 @@ MonoBehaviour:
   m_Pos:
     serializedVersion: 2
     x: 0
-    y: 70.4
+    y: 24
     width: 605.4
     height: 350.8
   m_SerializedDataModeController:
