@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 07eb92aa2472bfd4a905e42cf0a4cef2
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 149329
+  packageName: Mahjong Complete Set
+  packageVersion: 1.0
+  assetPath: Assets/Mahjong Complete Set/Scripts/Fullscreen.cs
+  uploadId: 318924
