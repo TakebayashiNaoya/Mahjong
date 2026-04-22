@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using UnityEngine;
 
@@ -9,6 +10,15 @@ using UnityEngine;
 /// </summary>
 public class Hand
 {
+    // ========================================
+    // 定数
+    // ========================================
+    /// <summary>
+    /// 配牌時の初期手牌枚数
+    /// </summary>
+    private const int INITIAL_TILE_COUNT = 13;
+
+
     // ========================================
     // プロパティ
     // ========================================
@@ -23,9 +33,9 @@ public class Hand
     public Tile DrawnTile { get; private set; }
     /// <summary>
     /// 副露リスト
-    /// 外部からの変更を防ぐために AsReadOnly でラップして返す
+    /// ReadOnlyCollection をフィールドとして保持することで毎回の生成コストを避ける
     /// </summary>
-    public IReadOnlyList<Meld> Melds => _melds.AsReadOnly();
+    public IReadOnlyList<Meld> Melds => _meldsReadOnly;
     /// <summary>
     /// 手牌の合計枚数（Tiles + DrawnTile）
     /// 副露した牌は含まない
@@ -44,6 +54,23 @@ public class Hand
     /// 副露リスト（内部）
     /// </summary>
     private readonly List<Meld> _melds = new();
+    /// <summary>
+    /// 副露リストの読み取り専用ラッパー
+    /// _melds と同じインスタンスを参照するため、_melds の変更が反映される
+    /// </summary>
+    private readonly ReadOnlyCollection<Meld> _meldsReadOnly;
+
+
+    // ========================================
+    // コンストラクタ
+    // ========================================
+    /// <summary>
+    /// 手牌を初期化する
+    /// </summary>
+    public Hand()
+    {
+        _meldsReadOnly = _melds.AsReadOnly();
+    }
 
 
     // ========================================
@@ -288,6 +315,12 @@ public class Hand
         if (tiles == null)
         {
             Debug.LogError("tiles が null です");
+            return;
+        }
+
+        if (tiles.Count != INITIAL_TILE_COUNT)
+        {
+            Debug.LogError($"配牌の枚数が不正です。{INITIAL_TILE_COUNT}枚である必要があります: {tiles.Count}枚");
             return;
         }
 
