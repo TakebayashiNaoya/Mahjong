@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 
 /// <summary>
@@ -13,7 +13,7 @@ public class Meld
     /// <summary>
     /// 副露の種類
     /// </summary>
-    public MeldType Type { get; }
+    public MeldType Type { get; private set; }
     /// <summary>
     /// 副露を構成する牌（3〜4枚）
     /// </summary>
@@ -48,7 +48,10 @@ public class Meld
     public Meld(MeldType type, List<Tile> tiles, Tile stolenTile = null, Wind? fromWind = null)
     {
         Type = type;
-        Tiles = tiles.AsReadOnly();
+
+        // 呼び出し元のリスト変更の影響を受けないようにコピーする
+        Tiles = new List<Tile>(tiles).AsReadOnly();
+
         StolenTile = stolenTile;
         FromWind = fromWind;
     }
@@ -59,12 +62,14 @@ public class Meld
     // ========================================
     /// <summary>
     /// 加槓：ポン済みの刻子に1枚追加して槓子にする
+    /// Type を KaKan に変更し、牌を4枚に更新する
     /// </summary>
     /// <param name="tile">追加する牌</param>
-    public void AddKakanTile(Tile tile)
+    public void ApplyKakan(Tile tile)
     {
         var newTiles = new List<Tile>(Tiles) { tile };
         Tiles = newTiles.AsReadOnly();
+        Type = MeldType.KaKan;
     }
     /// <summary>
     /// 副露の文字列表現を返す
