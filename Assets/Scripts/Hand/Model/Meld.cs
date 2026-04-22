@@ -1,4 +1,6 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 
@@ -46,8 +48,26 @@ public class Meld
     /// <param name="tiles">副露を構成する牌（3〜4枚）</param>
     /// <param name="stolenTile">他家から鳴いた牌（暗槓はnull）</param>
     /// <param name="fromWind">鳴いた方向（暗槓はnull）</param>
+    /// <exception cref="ArgumentNullException">tiles が null の場合</exception>
+    /// <exception cref="ArgumentException">tiles の枚数が3〜4枚でない場合、または stolenTile が tiles に含まれていない場合</exception>
     public Meld(MeldType type, List<Tile> tiles, Tile stolenTile = null, Wind? fromWind = null)
     {
+        if (tiles == null)
+        {
+            throw new ArgumentNullException(nameof(tiles), "tiles が null です");
+        }
+
+        if (tiles.Count < 3 || tiles.Count > 4)
+        {
+            throw new ArgumentException($"tiles は3〜4枚である必要があります: {tiles.Count}枚", nameof(tiles));
+        }
+
+        // StolenTile が tiles に含まれているか検証する
+        if (stolenTile != null && !tiles.Any(t => t.IsSameType(stolenTile)))
+        {
+            throw new ArgumentException($"stolenTile が tiles に含まれていません: {stolenTile}", nameof(stolenTile));
+        }
+
         Type = type;
 
         // 呼び出し元のリスト変更の影響を受けないようにコピーする
@@ -64,8 +84,10 @@ public class Meld
     /// <summary>
     /// 加槓：ポン済みの刻子に1枚追加して槓子にする
     /// Type を KaKan に変更し、牌を4枚に更新する
-    /// ポン済み（Type == Pon かつ Tiles が3枚）でない場合は false を返す
-    /// 呼び出し元は戻り値を確認してから牌を手牌より除去すること
+    /// 以下の条件を満たさない場合は false を返す
+    /// ・Type == Pon かつ Tiles が3枚であること
+    /// ・追加する牌が既存の牌と同じ種類であること
+    /// 呼び出し元は戻り値を確認してから手牌の牌を除去すること
     /// </summary>
     /// <param name="tile">追加する牌</param>
     /// <returns>成功した場合は true</returns>
@@ -74,6 +96,12 @@ public class Meld
         if (Type != MeldType.Pon || Tiles.Count != 3)
         {
             Debug.LogError($"TryApplyKakan はポン済みの面子（3枚）にのみ使用できます。Type={Type}, Count={Tiles.Count}");
+            return false;
+        }
+
+        if (!Tiles[0].IsSameType(tile))
+        {
+            Debug.LogError($"加槓する牌の種類が一致しません: 面子={Tiles[0]}, 追加牌={tile}");
             return false;
         }
 
