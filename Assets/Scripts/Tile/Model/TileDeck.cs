@@ -14,7 +14,7 @@ public class TileDeck
     /// <summary>
     /// 残りのツモ可能枚数
     /// </summary>
-    public int RemainingCount => _tiles.Count - DeadWallCount - _drawIndex;
+    public int RemainingCount => _tiles.Count - DEAD_WALL_COUNT - _drawIndex;
     /// <summary>
     /// 山が尽きているかどうか
     /// </summary>
@@ -86,7 +86,7 @@ public class TileDeck
     public Tile DrawRinshan()
     {
         // 王牌の末尾（嶺上牌）を取得する
-        var rinshanIndex = _tiles.Count - DeadWallCount;
+        var rinshanIndex = _tiles.Count - DEAD_WALL_COUNT;
         var tile = _tiles[rinshanIndex];
 
         // 使用済みの嶺上牌をリストから除外する
@@ -193,7 +193,7 @@ public class TileDeck
     {
         var deadWall = new List<Tile>();
 
-        for (var i = _tiles.Count - DeadWallCount; i < _tiles.Count; i++)
+        for (var i = _tiles.Count - DEAD_WALL_COUNT; i < _tiles.Count; i++)
         {
             deadWall.Add(_tiles[i]);
         }
