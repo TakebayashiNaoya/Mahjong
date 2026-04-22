@@ -215,6 +215,8 @@ public class Hand
     /// 加槓を行う
     /// ポン済みの刻子に手牌から同じ牌を1枚追加して槓子にする
     /// TryApplyKakan で検証・更新が成功してから手牌の牌を除去する
+    /// 加槓成立後は DrawnTile を手牌に戻して null にする
+    /// これにより加槓後に嶺上牌の Draw が可能な状態になる
     /// </summary>
     /// <param name="tile">追加する牌</param>
     /// <returns>成功した場合は true</returns>
@@ -258,6 +260,7 @@ public class Hand
             return false;
         }
 
+        // 加槓に使った牌を除去する
         if (DrawnTile == target)
         {
             DrawnTile = null;
@@ -265,6 +268,15 @@ public class Hand
         else
         {
             _tiles.Remove(target);
+        }
+
+        // 加槓成立後は DrawnTile が残っている場合も手牌に戻して null にする
+        // これにより加槓後の嶺上牌 Draw が可能な状態になる
+        if (DrawnTile != null)
+        {
+            _tiles.Add(DrawnTile);
+            DrawnTile = null;
+            Sort();
         }
 
         return true;
