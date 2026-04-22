@@ -66,7 +66,6 @@ public class Hand
     /// <summary>
     /// 牌を捨てる
     /// ツモ牌または手牌から1枚を捨て、ソートし直す
-    /// UI 側でどの牌インスタンスを捨てるか指定する想定のため、参照で比較する
     /// 同種の牌が複数ある場合はツモ牌を優先して捨てる
     /// </summary>
     /// <param name="tile">捨てる牌</param>
@@ -105,7 +104,8 @@ public class Hand
     /// <summary>
     /// 副露を追加する
     /// 手牌から副露に使う牌を取り除き、副露リストに加える
-    /// 牌が1枚でも見つからない場合は処理を中断する
+    /// StolenTile と同種の牌は最初の1枚のみスキップし、残りは手牌から取り除く
+    /// 牌が1枚でも見つからない場合は処理を中断して false を返す
     /// </summary>
     /// <param name="meld">追加する副露</param>
     /// <returns>成功した場合は true</returns>
@@ -118,15 +118,18 @@ public class Hand
             DrawnTile = null;
         }
 
-        // 手牌から取り除く牌のリストを作成する（StolenTile は手牌にないのでスキップ）
+        // 手牌から取り除く牌のリストを作成する
+        // StolenTile と同種の牌は最初の1枚だけスキップする（鳴いた牌は手牌にないため）
         var tilesToRemove = new List<Tile>();
+        var stolenSkipped = false;
 
         foreach (var meldTile in meld.Tiles)
         {
-            if (meld.StolenTile != null && meldTile.IsSameType(meld.StolenTile))
+            if (!stolenSkipped
+                && meld.StolenTile != null
+                && meldTile.IsSameType(meld.StolenTile))
             {
-                // 鳴いた牌は手牌にないのでスキップ
-                // 同種が複数ある場合に1枚だけスキップするためフラグ管理する
+                stolenSkipped = true;
                 continue;
             }
 
@@ -153,7 +156,11 @@ public class Hand
         foreach (var removeTarget in tilesToRemove)
         {
             var found = _tiles.FirstOrDefault(t => t.IsSameType(removeTarget));
-            _tiles.Remove(found);
+
+            if (found != null)
+            {
+                _tiles.Remove(found);
+            }
         }
 
         _melds.Add(meld);
