@@ -160,9 +160,9 @@ public class TileDeck
         // 字牌（各4枚）
         var jihaiIds = new[]
         {
-                TileId.East, TileId.South, TileId.West, TileId.North,
-                TileId.Haku, TileId.Hatsu, TileId.Chun,
-            };
+            TileId.East, TileId.South, TileId.West, TileId.North,
+            TileId.Haku, TileId.Hatsu, TileId.Chun,
+        };
 
         foreach (var jihaiId in jihaiIds)
         {
