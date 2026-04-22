@@ -64,20 +64,23 @@ public class Meld
     /// <summary>
     /// 加槓：ポン済みの刻子に1枚追加して槓子にする
     /// Type を KaKan に変更し、牌を4枚に更新する
-    /// ポン済み（Type == Pon かつ Tiles が3枚）でない場合はエラーを出して処理を中断する
+    /// ポン済み（Type == Pon かつ Tiles が3枚）でない場合は false を返す
+    /// 呼び出し元は戻り値を確認してから牌を手牌より除去すること
     /// </summary>
     /// <param name="tile">追加する牌</param>
-    public void ApplyKakan(Tile tile)
+    /// <returns>成功した場合は true</returns>
+    public bool TryApplyKakan(Tile tile)
     {
         if (Type != MeldType.Pon || Tiles.Count != 3)
         {
-            Debug.LogError($"ApplyKakan はポン済みの面子（3枚）にのみ使用できます。Type={Type}, Count={Tiles.Count}");
-            return;
+            Debug.LogError($"TryApplyKakan はポン済みの面子（3枚）にのみ使用できます。Type={Type}, Count={Tiles.Count}");
+            return false;
         }
 
         var newTiles = new List<Tile>(Tiles) { tile };
         Tiles = newTiles.AsReadOnly();
         Type = MeldType.KaKan;
+        return true;
     }
     /// <summary>
     /// 副露の文字列表現を返す
