@@ -27,6 +27,7 @@ public class Hand
     public IReadOnlyList<Meld> Melds => _melds;
     /// <summary>
     /// 手牌の合計枚数（Tiles + DrawnTile）
+    /// 副露した牌は含まない
     /// </summary>
     public int TileCount => _tiles.Count + (DrawnTile != null ? 1 : 0);
 
@@ -170,6 +171,7 @@ public class Hand
     /// <summary>
     /// 加槓を行う
     /// ポン済みの刻子に手牌から同じ牌を1枚追加して槓子にする
+    /// TryApplyKakan で検証・更新が成功してから手牌の牌を除去する
     /// </summary>
     /// <param name="tile">追加する牌</param>
     /// <returns>成功した場合は true</returns>
@@ -185,22 +187,16 @@ public class Hand
             return false;
         }
 
-        // 手牌またはツモ牌から該当する牌を取り除く
+        // 加槓に使う牌を手牌またはツモ牌から探す（まだ除去しない）
         Tile target = null;
 
         if (DrawnTile != null && DrawnTile.IsSameType(tile))
         {
             target = DrawnTile;
-            DrawnTile = null;
         }
         else
         {
             target = _tiles.FirstOrDefault(t => t.IsSameType(tile));
-
-            if (target != null)
-            {
-                _tiles.Remove(target);
-            }
         }
 
         if (target == null)
@@ -209,22 +205,51 @@ public class Hand
             return false;
         }
 
-        // Meld の Type を KaKan に変更して牌を追加する
-        ponMeld.ApplyKakan(target);
+        // 検証・更新が成功してから手牌の牌を除去する
+        if (!ponMeld.TryApplyKakan(target))
+        {
+            return false;
+        }
+
+        if (DrawnTile == target)
+        {
+            DrawnTile = null;
+        }
+        else
+        {
+            _tiles.Remove(target);
+        }
+
         return true;
     }
     /// <summary>
-    /// 手牌とツモ牌を合わせた全牌リストを返す
-    /// 和了判定・シャンテン計算などに使用する
+    /// 手牌とツモ牌を返す（副露牌は含まない）
+    /// シャンテン数計算など、門前の牌のみが必要な場合に使用する
     /// </summary>
-    /// <returns>全牌リスト</returns>
-    public List<Tile> GetAllTiles()
+    /// <returns>手牌 + ツモ牌のリスト</returns>
+    public List<Tile> GetClosedTiles()
     {
         var all = new List<Tile>(_tiles);
 
         if (DrawnTile != null)
         {
             all.Add(DrawnTile);
+        }
+
+        return all;
+    }
+    /// <summary>
+    /// 手牌・ツモ牌・副露牌をすべて含む全牌リストを返す
+    /// 役判定など、すべての牌が必要な場合に使用する
+    /// </summary>
+    /// <returns>手牌 + ツモ牌 + 副露牌のリスト</returns>
+    public List<Tile> GetAllTiles()
+    {
+        var all = GetClosedTiles();
+
+        foreach (var meld in _melds)
+        {
+            all.AddRange(meld.Tiles);
         }
 
         return all;
