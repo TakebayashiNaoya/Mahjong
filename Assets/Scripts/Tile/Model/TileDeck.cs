@@ -31,7 +31,7 @@ public class TileDeck
     /// <summary>
     /// 王牌（カンドラ用に残す牌）の枚数
     /// </summary>
-    private const int DeadWallCount = 14;
+    private const int DEAD_WALL_COUNT = 14;
 
 
     // ========================================
