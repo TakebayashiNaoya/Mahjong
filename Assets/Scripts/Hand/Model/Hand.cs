@@ -1,7 +1,7 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
-using UnityEngine;
 
 
 /// <summary>
@@ -79,21 +79,20 @@ public class Hand
     /// <summary>
     /// 牌をツモる
     /// DrawnTile にセットし、手牌リストには加えない
-    /// null またはすでにツモ牌がある場合はエラーを出して処理を中断する
     /// </summary>
     /// <param name="tile">ツモった牌</param>
+    /// <exception cref="ArgumentNullException">tile が null の場合</exception>
+    /// <exception cref="InvalidOperationException">すでにツモ牌がある場合</exception>
     public void Draw(Tile tile)
     {
         if (tile == null)
         {
-            Debug.LogError("ツモ牌が null です");
-            return;
+            throw new ArgumentNullException(nameof(tile), "ツモ牌が null です");
         }
 
         if (DrawnTile != null)
         {
-            Debug.LogError("すでにツモ牌があります。Discard を呼んでから Draw してください");
-            return;
+            throw new InvalidOperationException("すでにツモ牌があります。Discard を呼んでから Draw してください");
         }
 
         DrawnTile = tile;
@@ -102,15 +101,17 @@ public class Hand
     /// 牌を捨てる
     /// ツモ牌または手牌から1枚を捨て、ソートし直す
     /// 同種の牌が複数ある場合はツモ牌を優先して捨てる
+    /// Sort で赤ドラは通常牌の後ろに並ぶため、通常牌が優先して捨てられる
     /// </summary>
     /// <param name="tile">捨てる牌</param>
-    /// <returns>捨てた牌。失敗した場合は null</returns>
+    /// <returns>捨てた牌</returns>
+    /// <exception cref="ArgumentNullException">tile が null の場合</exception>
+    /// <exception cref="InvalidOperationException">捨てる牌が手牌にない場合</exception>
     public Tile Discard(Tile tile)
     {
         if (tile == null)
         {
-            Debug.LogError("捨てる牌が null です");
-            return null;
+            throw new ArgumentNullException(nameof(tile), "捨てる牌が null です");
         }
 
         // ツモ牌を捨てる場合
@@ -126,8 +127,7 @@ public class Hand
 
         if (target == null)
         {
-            Debug.LogError($"捨てようとした牌が手牌にありません: {tile}");
-            return null;
+            throw new InvalidOperationException($"捨てようとした牌が手牌にありません: {tile}");
         }
 
         _tiles.Remove(target);
@@ -146,16 +146,15 @@ public class Hand
     /// 副露を追加する
     /// 手牌から副露に使う牌を取り除き、副露リストに加える
     /// StolenTile と同種の牌は最初の1枚のみスキップし、残りは手牌から取り除く
-    /// meld が null または牌が1枚でも見つからない場合は処理を中断して false を返す
     /// </summary>
     /// <param name="meld">追加する副露</param>
-    /// <returns>成功した場合は true</returns>
-    public bool AddMeld(Meld meld)
+    /// <exception cref="ArgumentNullException">meld が null の場合</exception>
+    /// <exception cref="InvalidOperationException">副露に使う牌が手牌にない場合</exception>
+    public void AddMeld(Meld meld)
     {
         if (meld == null)
         {
-            Debug.LogError("meld が null です");
-            return false;
+            throw new ArgumentNullException(nameof(meld), "meld が null です");
         }
 
         // ツモ牌が残っている場合は手牌に戻す
@@ -192,8 +191,7 @@ public class Hand
 
             if (found == null)
             {
-                Debug.LogError($"副露に使う牌が手牌にありません: {removeTarget}");
-                return false;
+                throw new InvalidOperationException($"副露に使う牌が手牌にありません: {removeTarget}");
             }
 
             tempTiles.Remove(found);
@@ -212,7 +210,6 @@ public class Hand
 
         _melds.Add(meld);
         Sort();
-        return true;
     }
     /// <summary>
     /// 加槓を行う
@@ -221,12 +218,12 @@ public class Hand
     /// </summary>
     /// <param name="tile">追加する牌</param>
     /// <returns>成功した場合は true</returns>
+    /// <exception cref="ArgumentNullException">tile が null の場合</exception>
     public bool AddKakan(Tile tile)
     {
         if (tile == null)
         {
-            Debug.LogError("加槓する牌が null です");
-            return false;
+            throw new ArgumentNullException(nameof(tile), "加槓する牌が null です");
         }
 
         // ポン済みの面子を探す
@@ -235,7 +232,6 @@ public class Hand
 
         if (ponMeld == null)
         {
-            Debug.LogWarning($"加槓できる面子が見つかりません: {tile}");
             return false;
         }
 
@@ -253,7 +249,6 @@ public class Hand
 
         if (target == null)
         {
-            Debug.LogError($"加槓する牌が手牌にありません: {tile}");
             return false;
         }
 
@@ -310,18 +305,18 @@ public class Hand
     /// 配牌時に手牌をまとめてセットする
     /// </summary>
     /// <param name="tiles">配牌する牌のリスト（13枚）</param>
+    /// <exception cref="ArgumentNullException">tiles が null の場合</exception>
+    /// <exception cref="ArgumentException">tiles の枚数が13枚でない場合</exception>
     public void SetInitialTiles(List<Tile> tiles)
     {
         if (tiles == null)
         {
-            Debug.LogError("tiles が null です");
-            return;
+            throw new ArgumentNullException(nameof(tiles), "tiles が null です");
         }
 
         if (tiles.Count != INITIAL_TILE_COUNT)
         {
-            Debug.LogError($"配牌の枚数が不正です。{INITIAL_TILE_COUNT}枚である必要があります: {tiles.Count}枚");
-            return;
+            throw new ArgumentException($"配牌の枚数が不正です。{INITIAL_TILE_COUNT}枚である必要があります: {tiles.Count}枚", nameof(tiles));
         }
 
         _tiles.Clear();
@@ -336,28 +331,24 @@ public class Hand
     // プライベートメソッド
     // ========================================
     /// <summary>
-    /// 手牌をスーツ→数字の順にソートする
+    /// 手牌をスーツ→数字→赤ドラの順に安定ソートする
     /// ソート順：萬子 → 筒子 → 索子 → 字牌
+    /// 同種の牌では通常牌を赤ドラより前に並べる（意図しない赤ドラ捨てを防ぐ）
+    /// List.Sort は不安定ソートのため、インデックスを使った安定ソートで実装する
     /// </summary>
     private void Sort()
     {
-        _tiles.Sort((a, b) =>
-        {
-            // スーツ比較
-            var suitCompare = a.Suit.CompareTo(b.Suit);
+        // インデックス付きで安定ソートを実現する
+        var indexed = _tiles
+            .Select((tile, index) => (tile, index))
+            .OrderBy(t => t.tile.Suit)
+            .ThenBy(t => t.tile.Suit == TileSuit.Jihai ? (int)t.tile.Id : t.tile.Number)
+            .ThenBy(t => t.tile.IsRed ? 1 : 0)
+            .ThenBy(t => t.index)
+            .Select(t => t.tile)
+            .ToList();
 
-            if (suitCompare != 0)
-            {
-                return suitCompare;
-            }
-
-            // 数字比較（字牌は TileId で比較）
-            if (a.Suit == TileSuit.Jihai)
-            {
-                return a.Id.CompareTo(b.Id);
-            }
-
-            return a.Number.CompareTo(b.Number);
-        });
+        _tiles.Clear();
+        _tiles.AddRange(indexed);
     }
 }
