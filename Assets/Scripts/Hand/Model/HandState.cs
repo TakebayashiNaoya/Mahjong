@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using UnityEngine;
 
 
 /// <summary>
@@ -53,9 +54,15 @@ public class HandState
     /// <summary>
     /// リーチを宣言する
     /// </summary>
-    /// <param name="turnIndex">宣言したターン番号</param>
+    /// <param name="turnIndex">宣言したターン番号（0以上）</param>
     public void DeclareRiichi(int turnIndex)
     {
+        if (turnIndex < 0)
+        {
+            Debug.LogError($"turnIndex は0以上である必要があります: {turnIndex}");
+            return;
+        }
+
         IsRiichi = true;
         IppatsuAvailable = true;
         RiichiTurnIndex = turnIndex;
@@ -66,6 +73,12 @@ public class HandState
     /// <param name="tile">捨てた牌</param>
     public void AddDiscard(Tile tile)
     {
+        if (tile == null)
+        {
+            Debug.LogError("捨て牌が null です");
+            return;
+        }
+
         _discardedTiles.Add(tile);
     }
     /// <summary>
