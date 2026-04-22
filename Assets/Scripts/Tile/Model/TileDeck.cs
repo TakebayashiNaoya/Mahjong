@@ -14,7 +14,7 @@ public class TileDeck
     /// <summary>
     /// 残りのツモ可能枚数
     /// </summary>
-    public int RemainingCount => _tiles.Count - DeadWallCount - _drawIndex;
+    public int RemainingCount => _tiles.Count - DEAD_WALL_COUNT - _drawIndex;
     /// <summary>
     /// 山が尽きているかどうか
     /// </summary>
@@ -31,7 +31,7 @@ public class TileDeck
     /// <summary>
     /// 王牌（カンドラ用に残す牌）の枚数
     /// </summary>
-    private const int DeadWallCount = 14;
+    private const int DEAD_WALL_COUNT = 14;
 
 
     // ========================================
@@ -81,12 +81,13 @@ public class TileDeck
     }
     /// <summary>
     /// 嶺上牌をツモる（カン時に使用）
-    /// 王牌の末尾から取得する
+    /// 王牌の先頭（山牌との境界）から取得する
+    /// 取得後は王牌を再設定して枚数を維持する
     /// </summary>
     public Tile DrawRinshan()
     {
-        // 王牌の末尾（嶺上牌）を取得する
-        var rinshanIndex = _tiles.Count - DeadWallCount;
+        // 王牌の先頭（山牌との境界）を嶺上牌として取得する
+        var rinshanIndex = _tiles.Count - DEAD_WALL_COUNT;
         var tile = _tiles[rinshanIndex];
 
         // 使用済みの嶺上牌をリストから除外する
@@ -160,9 +161,9 @@ public class TileDeck
         // 字牌（各4枚）
         var jihaiIds = new[]
         {
-                TileId.East, TileId.South, TileId.West, TileId.North,
-                TileId.Haku, TileId.Hatsu, TileId.Chun,
-            };
+            TileId.East, TileId.South, TileId.West, TileId.North,
+            TileId.Haku, TileId.Hatsu, TileId.Chun,
+        };
 
         foreach (var jihaiId in jihaiIds)
         {
@@ -193,7 +194,7 @@ public class TileDeck
     {
         var deadWall = new List<Tile>();
 
-        for (var i = _tiles.Count - DeadWallCount; i < _tiles.Count; i++)
+        for (var i = _tiles.Count - DEAD_WALL_COUNT; i < _tiles.Count; i++)
         {
             deadWall.Add(_tiles[i]);
         }
