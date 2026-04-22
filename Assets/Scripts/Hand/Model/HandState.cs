@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using UnityEngine;
 
@@ -30,8 +31,10 @@ public class HandState
     public bool IsFuriten { get; private set; }
     /// <summary>
     /// 捨て牌の履歴（フリテン判定に使用）
+    /// ReadOnlyCollection をフィールドとして保持することで毎回の生成コストを避け、
+    /// 外部からの変更（ダウンキャスト経由）も防ぐ
     /// </summary>
-    public IReadOnlyList<Tile> DiscardedTiles => _discardedTiles;
+    public IReadOnlyList<Tile> DiscardedTiles => _discardedTilesReadOnly;
     /// <summary>
     /// リーチを宣言したターン番号
     /// リーチしていない場合は -1
@@ -46,6 +49,23 @@ public class HandState
     /// 捨て牌の履歴（内部）
     /// </summary>
     private readonly List<Tile> _discardedTiles = new();
+    /// <summary>
+    /// 捨て牌履歴の読み取り専用ラッパー
+    /// _discardedTiles と同じインスタンスを参照するため、追加が自動的に反映される
+    /// </summary>
+    private readonly ReadOnlyCollection<Tile> _discardedTilesReadOnly;
+
+
+    // ========================================
+    // コンストラクタ
+    // ========================================
+    /// <summary>
+    /// 手牌状態を初期化する
+    /// </summary>
+    public HandState()
+    {
+        _discardedTilesReadOnly = _discardedTiles.AsReadOnly();
+    }
 
 
     // ========================================
