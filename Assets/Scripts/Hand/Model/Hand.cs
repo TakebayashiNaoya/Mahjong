@@ -23,8 +23,9 @@ public class Hand
     public Tile DrawnTile { get; private set; }
     /// <summary>
     /// 副露リスト
+    /// 外部からの変更を防ぐために AsReadOnly でラップして返す
     /// </summary>
-    public IReadOnlyList<Meld> Melds => _melds;
+    public IReadOnlyList<Meld> Melds => _melds.AsReadOnly();
     /// <summary>
     /// 手牌の合計枚数（Tiles + DrawnTile）
     /// 副露した牌は含まない
@@ -51,11 +52,17 @@ public class Hand
     /// <summary>
     /// 牌をツモる
     /// DrawnTile にセットし、手牌リストには加えない
-    /// すでにツモ牌がある場合はエラーを出して処理を中断する
+    /// null またはすでにツモ牌がある場合はエラーを出して処理を中断する
     /// </summary>
     /// <param name="tile">ツモった牌</param>
     public void Draw(Tile tile)
     {
+        if (tile == null)
+        {
+            Debug.LogError("ツモ牌が null です");
+            return;
+        }
+
         if (DrawnTile != null)
         {
             Debug.LogError("すでにツモ牌があります。Discard を呼んでから Draw してください");
@@ -73,6 +80,12 @@ public class Hand
     /// <returns>捨てた牌。失敗した場合は null</returns>
     public Tile Discard(Tile tile)
     {
+        if (tile == null)
+        {
+            Debug.LogError("捨てる牌が null です");
+            return null;
+        }
+
         // ツモ牌を捨てる場合
         if (DrawnTile != null && DrawnTile.IsSameType(tile))
         {
@@ -106,12 +119,18 @@ public class Hand
     /// 副露を追加する
     /// 手牌から副露に使う牌を取り除き、副露リストに加える
     /// StolenTile と同種の牌は最初の1枚のみスキップし、残りは手牌から取り除く
-    /// 牌が1枚でも見つからない場合は処理を中断して false を返す
+    /// meld が null または牌が1枚でも見つからない場合は処理を中断して false を返す
     /// </summary>
     /// <param name="meld">追加する副露</param>
     /// <returns>成功した場合は true</returns>
     public bool AddMeld(Meld meld)
     {
+        if (meld == null)
+        {
+            Debug.LogError("meld が null です");
+            return false;
+        }
+
         // ツモ牌が残っている場合は手牌に戻す
         if (DrawnTile != null)
         {
@@ -177,6 +196,12 @@ public class Hand
     /// <returns>成功した場合は true</returns>
     public bool AddKakan(Tile tile)
     {
+        if (tile == null)
+        {
+            Debug.LogError("加槓する牌が null です");
+            return false;
+        }
+
         // ポン済みの面子を探す
         var ponMeld = _melds.FirstOrDefault(m =>
             m.Type == MeldType.Pon && m.Tiles[0].IsSameType(tile));
@@ -260,6 +285,12 @@ public class Hand
     /// <param name="tiles">配牌する牌のリスト（13枚）</param>
     public void SetInitialTiles(List<Tile> tiles)
     {
+        if (tiles == null)
+        {
+            Debug.LogError("tiles が null です");
+            return;
+        }
+
         _tiles.Clear();
         _melds.Clear();
         DrawnTile = null;
