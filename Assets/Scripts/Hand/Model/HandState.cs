@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
-using UnityEngine;
 
 
 /// <summary>
@@ -75,12 +74,12 @@ public class HandState
     /// リーチを宣言する
     /// </summary>
     /// <param name="turnIndex">宣言したターン番号（0以上）</param>
+    /// <exception cref="ArgumentOutOfRangeException">turnIndex が0未満の場合</exception>
     public void DeclareRiichi(int turnIndex)
     {
         if (turnIndex < 0)
         {
-            Debug.LogError($"turnIndex は0以上である必要があります: {turnIndex}");
-            return;
+            throw new ArgumentOutOfRangeException(nameof(turnIndex), $"turnIndex は0以上である必要があります: {turnIndex}");
         }
 
         IsRiichi = true;
@@ -91,12 +90,12 @@ public class HandState
     /// 捨て牌を記録する
     /// </summary>
     /// <param name="tile">捨てた牌</param>
+    /// <exception cref="ArgumentNullException">tile が null の場合</exception>
     public void AddDiscard(Tile tile)
     {
         if (tile == null)
         {
-            Debug.LogError("捨て牌が null です");
-            return;
+            throw new ArgumentNullException(nameof(tile), "捨て牌が null です");
         }
 
         _discardedTiles.Add(tile);
