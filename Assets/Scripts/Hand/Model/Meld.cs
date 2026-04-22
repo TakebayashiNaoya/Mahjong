@@ -44,8 +44,10 @@ public class Meld
     /// <summary>
     /// 副露を生成する
     /// 副露種別ごとに以下の制約がある
-    /// ・Chi / Pon / DaiMinKan : stolenTile・fromWind は必須（非null）、枚数は3枚
-    /// ・AnKan                 : stolenTile・fromWind は null 必須、枚数は4枚
+    /// ・Chi / Pon          : stolenTile・fromWind は必須（非null）、枚数は3枚
+    /// ・DaiMinKan          : stolenTile・fromWind は必須（非null）、枚数は4枚（手牌3枚 + 鳴いた1枚）
+    /// ・AnKan              : stolenTile・fromWind は null 必須、枚数は4枚
+    /// ・KaKan              : コンストラクタでの直接生成は不可。Hand.AddKakan を使用すること
     /// </summary>
     /// <param name="type">副露の種類</param>
     /// <param name="tiles">副露を構成する牌</param>
@@ -60,12 +62,10 @@ public class Meld
             throw new ArgumentNullException(nameof(tiles), "tiles が null です");
         }
 
-        // 副露種別ごとのバリデーション
         switch (type)
         {
             case MeldType.Chi:
             case MeldType.Pon:
-            case MeldType.DaiMinKan:
                 if (tiles.Count != 3)
                 {
                     throw new ArgumentException($"{type} の枚数は3枚である必要があります: {tiles.Count}枚", nameof(tiles));
@@ -79,6 +79,25 @@ public class Meld
                 if (fromWind == null)
                 {
                     throw new ArgumentException($"{type} の fromWind は null にできません", nameof(fromWind));
+                }
+
+                break;
+
+            case MeldType.DaiMinKan:
+                // 大明槓は手牌3枚 + 鳴いた1枚 = 4枚
+                if (tiles.Count != 4)
+                {
+                    throw new ArgumentException($"DaiMinKan の枚数は4枚である必要があります: {tiles.Count}枚", nameof(tiles));
+                }
+
+                if (stolenTile == null)
+                {
+                    throw new ArgumentException("DaiMinKan の stolenTile は null にできません", nameof(stolenTile));
+                }
+
+                if (fromWind == null)
+                {
+                    throw new ArgumentException("DaiMinKan の fromWind は null にできません", nameof(fromWind));
                 }
 
                 break;
@@ -105,6 +124,9 @@ public class Meld
                 // KaKan は Hand.AddKakan から TryApplyKakan 経由で生成されるため
                 // 直接コンストラクタで生成することは想定していない
                 throw new ArgumentException("KaKan は Meld のコンストラクタで直接生成できません。Hand.AddKakan を使用してください", nameof(type));
+
+            default:
+                throw new ArgumentException($"未対応の MeldType です: {type}", nameof(type));
         }
 
         // StolenTile が tiles に含まれているか検証する
