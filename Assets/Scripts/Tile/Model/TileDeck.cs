@@ -81,11 +81,12 @@ public class TileDeck
     }
     /// <summary>
     /// 嶺上牌をツモる（カン時に使用）
-    /// 王牌の末尾から取得する
+    /// 王牌の先頭（山牌との境界）から取得する
+    /// 取得後は王牌を再設定して枚数を維持する
     /// </summary>
     public Tile DrawRinshan()
     {
-        // 王牌の末尾（嶺上牌）を取得する
+        // 王牌の先頭（山牌との境界）を嶺上牌として取得する
         var rinshanIndex = _tiles.Count - DEAD_WALL_COUNT;
         var tile = _tiles[rinshanIndex];
 
