@@ -1,3 +1,4 @@
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -72,8 +73,14 @@ public class HandState
     /// 自分の捨て牌の中に、現在の待ち牌が含まれていれば true にする
     /// </summary>
     /// <param name="waitingTiles">現在の待ち牌リスト</param>
+    /// <exception cref="ArgumentNullException">waitingTiles が null の場合</exception>
     public void UpdateFuriten(IEnumerable<Tile> waitingTiles)
     {
+        if (waitingTiles == null)
+        {
+            throw new ArgumentNullException(nameof(waitingTiles), "waitingTiles が null です");
+        }
+
         IsFuriten = waitingTiles.Any(wait =>
             _discardedTiles.Any(discarded => discarded.IsSameType(wait)));
     }
