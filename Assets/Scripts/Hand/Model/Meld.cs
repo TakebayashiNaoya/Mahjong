@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using UnityEngine;
 
 
 /// <summary>
@@ -63,10 +64,17 @@ public class Meld
     /// <summary>
     /// 加槓：ポン済みの刻子に1枚追加して槓子にする
     /// Type を KaKan に変更し、牌を4枚に更新する
+    /// ポン済み（Type == Pon かつ Tiles が3枚）でない場合はエラーを出して処理を中断する
     /// </summary>
     /// <param name="tile">追加する牌</param>
     public void ApplyKakan(Tile tile)
     {
+        if (Type != MeldType.Pon || Tiles.Count != 3)
+        {
+            Debug.LogError($"ApplyKakan はポン済みの面子（3枚）にのみ使用できます。Type={Type}, Count={Tiles.Count}");
+            return;
+        }
+
         var newTiles = new List<Tile>(Tiles) { tile };
         Tiles = newTiles.AsReadOnly();
         Type = MeldType.KaKan;
