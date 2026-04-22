@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 
@@ -50,13 +50,15 @@ public class Hand
     /// <summary>
     /// 牌をツモる
     /// DrawnTile にセットし、手牌リストには加えない
+    /// すでにツモ牌がある場合はエラーを出して処理を中断する
     /// </summary>
     /// <param name="tile">ツモった牌</param>
     public void Draw(Tile tile)
     {
         if (DrawnTile != null)
         {
-            Debug.LogWarning("すでにツモ牌があります");
+            Debug.LogError("すでにツモ牌があります。Discard を呼んでから Draw してください");
+            return;
         }
 
         DrawnTile = tile;
@@ -64,9 +66,11 @@ public class Hand
     /// <summary>
     /// 牌を捨てる
     /// ツモ牌または手牌から1枚を捨て、ソートし直す
+    /// UI 側でどの牌インスタンスを捨てるか指定する想定のため、参照で比較する
+    /// 同種の牌が複数ある場合はツモ牌を優先して捨てる
     /// </summary>
     /// <param name="tile">捨てる牌</param>
-    /// <returns>捨てた牌</returns>
+    /// <returns>捨てた牌。失敗した場合は null</returns>
     public Tile Discard(Tile tile)
     {
         // ツモ牌を捨てる場合
@@ -100,10 +104,12 @@ public class Hand
     }
     /// <summary>
     /// 副露を追加する
-    /// 手牌から該当する牌を取り除き、副露リストに加える
+    /// 手牌から副露に使う牌を取り除き、副露リストに加える
+    /// 牌が1枚でも見つからない場合は処理を中断する
     /// </summary>
     /// <param name="meld">追加する副露</param>
-    public void AddMeld(Meld meld)
+    /// <returns>成功した場合は true</returns>
+    public bool AddMeld(Meld meld)
     {
         // ツモ牌が残っている場合は手牌に戻す
         if (DrawnTile != null)
@@ -112,35 +118,54 @@ public class Hand
             DrawnTile = null;
         }
 
-        // 副露に使う手牌の牌を取り除く（鳴いた牌を除く）
+        // 手牌から取り除く牌のリストを作成する（StolenTile は手牌にないのでスキップ）
+        var tilesToRemove = new List<Tile>();
+
         foreach (var meldTile in meld.Tiles)
         {
-            // 鳴いた牌（StolenTile）は手牌にないのでスキップ
-            if (meld.StolenTile != null && meldTile == meld.StolenTile)
+            if (meld.StolenTile != null && meldTile.IsSameType(meld.StolenTile))
             {
+                // 鳴いた牌は手牌にないのでスキップ
+                // 同種が複数ある場合に1枚だけスキップするためフラグ管理する
                 continue;
             }
 
-            var target = _tiles.FirstOrDefault(t => t.IsSameType(meldTile));
+            tilesToRemove.Add(meldTile);
+        }
 
-            if (target == null)
+        // 手牌に必要な牌がすべて揃っているか事前確認する
+        var tempTiles = new List<Tile>(_tiles);
+
+        foreach (var removeTarget in tilesToRemove)
+        {
+            var found = tempTiles.FirstOrDefault(t => t.IsSameType(removeTarget));
+
+            if (found == null)
             {
-                Debug.LogError($"副露に使う牌が手牌にありません: {meldTile}");
-                continue;
+                Debug.LogError($"副露に使う牌が手牌にありません: {removeTarget}");
+                return false;
             }
 
-            _tiles.Remove(target);
+            tempTiles.Remove(found);
+        }
+
+        // 確認が取れたので実際に手牌から取り除く
+        foreach (var removeTarget in tilesToRemove)
+        {
+            var found = _tiles.FirstOrDefault(t => t.IsSameType(removeTarget));
+            _tiles.Remove(found);
         }
 
         _melds.Add(meld);
         Sort();
+        return true;
     }
     /// <summary>
     /// 加槓を行う
     /// ポン済みの刻子に手牌から同じ牌を1枚追加して槓子にする
     /// </summary>
     /// <param name="tile">追加する牌</param>
-    /// <returns>加槓が成功したかどうか</returns>
+    /// <returns>成功した場合は true</returns>
     public bool AddKakan(Tile tile)
     {
         // ポン済みの面子を探す
@@ -177,7 +202,8 @@ public class Hand
             return false;
         }
 
-        ponMeld.AddKakanTile(target);
+        // Meld の Type を KaKan に変更して牌を追加する
+        ponMeld.ApplyKakan(target);
         return true;
     }
     /// <summary>
