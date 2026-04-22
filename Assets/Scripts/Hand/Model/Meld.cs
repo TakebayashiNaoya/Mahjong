@@ -62,6 +62,12 @@ public class Meld
             throw new ArgumentNullException(nameof(tiles), "tiles が null です");
         }
 
+        // tiles 内に null 要素が含まれていないか検証する
+        if (tiles.Any(t => t == null))
+        {
+            throw new ArgumentException("tiles に null の要素が含まれています", nameof(tiles));
+        }
+
         switch (type)
         {
             case MeldType.Chi:
