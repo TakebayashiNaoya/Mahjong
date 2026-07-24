@@ -232,6 +232,46 @@ namespace Mahjong.Model.Evaluation.Tests
         }
 
         [Test]
+        public void MultipleDecompositions_PicksHigherActualScore_NotJustHigherHan()
+        {
+            // A: ピンフ・ツモ・一盃口 = 3翻・固定20符 → 基本点 20*2^5 = 640
+            // B: 門前ツモ・役牌(中) = 2翻・50符 → 基本点 50*2^4 = 800
+            // 翻数だけならAが選ばれるが、実際の点数はBが上回る
+            var hand = CreateHand(
+                new List<Tile>
+                {
+                    M(1), M(2), M(3),
+                    P(1), P(2), P(3),
+                    S(1), S(2), S(3),
+                    M(4), M(5),
+                    Z(TileId.Haku), Z(TileId.Haku),
+                },
+                drawnTile: M(6));
+
+            var context = Context(isTsumo: true);
+
+            // P/S の順子は開始数字をずらし、萬子の重複順子と偶然「三色同順」を形成しないようにする
+            var decompositionA = StandardDecomposition(
+                new[] { Seq(M(1), M(2), M(3)), Seq(M(1), M(2), M(3)), Seq(P(4), P(5), P(6)), Seq(S(7), S(8), S(9)) },
+                Pair(M(9), M(9)),
+                WaitType.Ryanmen);
+
+            var tripletM1 = new HandGroup(GroupType.Triplet, new List<Tile> { M(1), M(1), M(1) }, isConcealed: true, containsWinningTile: false);
+            var tripletChun = new HandGroup(GroupType.Triplet, new List<Tile> { Z(TileId.Chun), Z(TileId.Chun), Z(TileId.Chun) }, isConcealed: false, containsWinningTile: false);
+            var decompositionB = StandardDecomposition(
+                new[] { tripletM1, tripletChun, Seq(P(4), P(5), P(6)), Seq(S(7), S(8), S(9)) },
+                Pair(M(9), M(9)),
+                WaitType.Kanchan);
+
+            var agari = new AgariResult(true, new List<HandDecomposition> { decompositionA, decompositionB });
+            var result = YakuEvaluator.Evaluate(hand, M(6), agari, context);
+
+            Assert.AreSame(decompositionB, result.BestDecomposition, "翻数ではなく符×翻数の実際の点数で高い方を選ぶべき");
+            Assert.AreEqual(50, result.Fu);
+            Assert.AreEqual(2, result.TotalHan);
+        }
+
+        [Test]
         public void Daisangen_YakumanSuppressesOtherYaku()
         {
             var hand = CreateHand(
