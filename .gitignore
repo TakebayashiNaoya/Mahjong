@@ -42,3 +42,5 @@ Debug/
 
 # User Settings
 /[Uu]ser[Ss]ettings/
+/.claude/
+/.vscode/
