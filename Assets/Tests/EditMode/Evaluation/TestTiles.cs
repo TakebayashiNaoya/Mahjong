@@ -83,6 +83,28 @@ namespace Mahjong.Model.Evaluation.Tests
         {
             return new Meld(MeldType.Pon, new List<Tile> { own1, own2, stolen }, stolen, fromWind);
         }
+        /// <summary>
+        /// 順子のグループを生成する（HandDecomposition を手組みするテスト用）
+        /// </summary>
+        public static HandGroup Seq(Tile low, Tile mid, Tile high)
+        {
+            return new HandGroup(GroupType.Sequence, new List<Tile> { low, mid, high }, isConcealed: true, containsWinningTile: false);
+        }
+        /// <summary>
+        /// 雀頭のグループを生成する（HandDecomposition を手組みするテスト用）
+        /// </summary>
+        public static HandGroup Pair(Tile a, Tile b)
+        {
+            return new HandGroup(GroupType.Pair, new List<Tile> { a, b }, isConcealed: true, containsWinningTile: false);
+        }
+        /// <summary>
+        /// 標準形の HandDecomposition を組み立てる（面子4つ＋雀頭1つ）
+        /// </summary>
+        public static HandDecomposition StandardDecomposition(IEnumerable<HandGroup> melds, HandGroup pair, WaitType waitType)
+        {
+            var groups = new List<HandGroup>(melds) { pair };
+            return new HandDecomposition(WinningForm.Standard, groups, winningGroup: null, waitType);
+        }
 
 
         // ========================================

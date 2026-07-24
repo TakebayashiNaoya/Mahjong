@@ -1,15 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using Mahjong.Model.Common;
+using Mahjong.Model.Evaluation.Internal;
 using Mahjong.Model.Tiles;
 
 namespace Mahjong.Model.Evaluation
 {
     /// <summary>
     /// 和了形に成立する役を判定する
-    /// 符・翻数から点数への変換（Score モジュール）はスコープ外で、
-    /// ここでは成立した役の一覧と合計翻数のみを返す
+    /// 符計算は FuCalculator、翻数から点数への変換は Score モジュールの責務で、
+    /// ここでは成立した役の一覧・合計翻数・符（分解パターン比較用）までを返す
     /// </summary>
     public static class YakuEvaluator
     {
@@ -19,8 +19,7 @@ namespace Mahjong.Model.Evaluation
         /// <summary>
         /// 和了形に成立する役を判定する
         /// AgariResult が持つ複数の分解パターンをそれぞれ評価し、
-        /// 役満優先・合計翻数最大の分解パターンを採用する
-        /// （符計算がまだ無いため、翻数のみによる暫定的な比較。Score モジュール実装時に見直す）
+        /// 役満優先・次に符×翻数から算出した実際の点数が最大の分解パターンを採用する
         /// </summary>
         /// <param name="hand">判定対象の手牌</param>
         /// <param name="winningTile">和了牌（ロンの場合は手牌にまだ含まれていない牌）</param>
@@ -64,8 +63,10 @@ namespace Mahjong.Model.Evaluation
                 var totalHan = isYakuman
                     ? yakuList.Sum(y => y.YakumanMultiplier)
                     : yakuList.Sum(y => y.Han);
+                var isPinfu = yakuList.Any(y => y.Id == YakuId.Pinfu);
+                var fu = FuCalculator.Calculate(decomposition, context, isMenzen, isPinfu);
 
-                var candidate = new YakuEvaluationResult(yakuList, totalHan, isYakuman, decomposition);
+                var candidate = new YakuEvaluationResult(yakuList, totalHan, isYakuman, decomposition, fu);
 
                 if (best == null || IsBetter(candidate, best))
                 {
@@ -73,7 +74,7 @@ namespace Mahjong.Model.Evaluation
                 }
             }
 
-            return best ?? new YakuEvaluationResult(Array.Empty<YakuResult>(), 0, false, null);
+            return best ?? new YakuEvaluationResult(Array.Empty<YakuResult>(), 0, false, null, 0);
         }
 
 
@@ -109,13 +110,27 @@ namespace Mahjong.Model.Evaluation
             return yakumanEntries.Count > 0 ? yakumanEntries : yaku;
         }
         /// <summary>
-        /// 分解パターン間で優劣を比較する（役満優先、次に合計翻数）
+        /// 分解パターン間で優劣を比較する（役満優先、次に符×翻数から算出した実際の点数、最後に翻数）
         /// </summary>
         private static bool IsBetter(YakuEvaluationResult candidate, YakuEvaluationResult current)
         {
             if (candidate.IsYakuman != current.IsYakuman)
             {
                 return candidate.IsYakuman;
+            }
+
+            if (candidate.IsYakuman)
+            {
+                // 役満同士は翻数（ダブル役満等の倍率合計）で比較する
+                return candidate.TotalHan > current.TotalHan;
+            }
+
+            var candidatePoints = BasicPointFormula.Calculate(candidate.Fu, candidate.TotalHan);
+            var currentPoints = BasicPointFormula.Calculate(current.Fu, current.TotalHan);
+
+            if (candidatePoints != currentPoints)
+            {
+                return candidatePoints > currentPoints;
             }
 
             return candidate.TotalHan > current.TotalHan;
@@ -311,7 +326,7 @@ namespace Mahjong.Model.Evaluation
                 return;
             }
 
-            if (IsYakuhaiTile(pairGroup.Tiles[0], context))
+            if (TileClassification.IsYakuhaiTile(pairGroup.Tiles[0], context))
             {
                 return;
             }
@@ -408,7 +423,7 @@ namespace Mahjong.Model.Evaluation
         private static void AddDragonYaku(List<YakuResult> yaku, List<HandGroup> tripletLikeGroups, HandGroup pairGroup)
         {
             var dragonKinds = tripletLikeGroups
-                .Where(g => IsDragon(g.Tiles[0]))
+                .Where(g => TileClassification.IsDragon(g.Tiles[0]))
                 .Select(g => g.Tiles[0].Id)
                 .Distinct()
                 .ToList();
@@ -418,7 +433,7 @@ namespace Mahjong.Model.Evaluation
                 yaku.Add(new YakuResult(DragonYakuId(dragonId), 1));
             }
 
-            var pairIsDragon = pairGroup != null && IsDragon(pairGroup.Tiles[0]);
+            var pairIsDragon = pairGroup != null && TileClassification.IsDragon(pairGroup.Tiles[0]);
 
             if (dragonKinds.Count == 3)
             {
@@ -433,11 +448,11 @@ namespace Mahjong.Model.Evaluation
         private static void AddWindYaku(
             List<YakuResult> yaku, List<HandGroup> tripletLikeGroups, HandGroup pairGroup, WinContext context)
         {
-            var windGroups = tripletLikeGroups.Where(g => IsWind(g.Tiles[0])).ToList();
+            var windGroups = tripletLikeGroups.Where(g => TileClassification.IsWind(g.Tiles[0])).ToList();
             var windKinds = windGroups.Select(g => g.Tiles[0].Id).Distinct().ToList();
 
-            var seatWindId = WindToTileId(context.SeatWind);
-            var roundWindId = WindToTileId(context.RoundWind);
+            var seatWindId = TileClassification.WindToTileId(context.SeatWind);
+            var roundWindId = TileClassification.WindToTileId(context.RoundWind);
 
             if (windGroups.Any(g => g.Tiles[0].Id == seatWindId))
             {
@@ -449,7 +464,7 @@ namespace Mahjong.Model.Evaluation
                 yaku.Add(new YakuResult(YakuId.YakuhaiRoundWind, 1));
             }
 
-            var pairIsWind = pairGroup != null && IsWind(pairGroup.Tiles[0]);
+            var pairIsWind = pairGroup != null && TileClassification.IsWind(pairGroup.Tiles[0]);
 
             if (windKinds.Count == 4)
             {
@@ -487,31 +502,6 @@ namespace Mahjong.Model.Evaluation
         // ========================================
         // プライベートメソッド（共通ヘルパー）
         // ========================================
-        private static bool IsDragon(Tile tile)
-        {
-            return tile.IsJihai && tile.Id is TileId.Haku or TileId.Hatsu or TileId.Chun;
-        }
-
-        private static bool IsWind(Tile tile)
-        {
-            return tile.IsJihai && tile.Id is TileId.East or TileId.South or TileId.West or TileId.North;
-        }
-
-        private static bool IsYakuhaiTile(Tile tile, WinContext context)
-        {
-            if (!tile.IsJihai)
-            {
-                return false;
-            }
-
-            if (IsDragon(tile))
-            {
-                return true;
-            }
-
-            return tile.Id == WindToTileId(context.SeatWind) || tile.Id == WindToTileId(context.RoundWind);
-        }
-
         private static YakuId DragonYakuId(TileId dragonId)
         {
             return dragonId switch
@@ -520,18 +510,6 @@ namespace Mahjong.Model.Evaluation
                 TileId.Hatsu => YakuId.YakuhaiHatsu,
                 TileId.Chun => YakuId.YakuhaiChun,
                 _ => throw new ArgumentException($"三元牌ではない TileId です: {dragonId}", nameof(dragonId)),
-            };
-        }
-
-        private static TileId WindToTileId(Wind wind)
-        {
-            return wind switch
-            {
-                Wind.East => TileId.East,
-                Wind.South => TileId.South,
-                Wind.West => TileId.West,
-                Wind.North => TileId.North,
-                _ => throw new ArgumentException($"未対応の Wind です: {wind}", nameof(wind)),
             };
         }
     }

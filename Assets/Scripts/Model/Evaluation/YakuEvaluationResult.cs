@@ -4,7 +4,8 @@ namespace Mahjong.Model.Evaluation
 {
     /// <summary>
     /// 役判定の最終結果
-    /// 複数の HandDecomposition のうち、最も合計翻数が高いものを採用した結果を表す
+    /// 複数の HandDecomposition のうち、実際の点数（役満優先、次に符×翻数）が最も高いものを
+    /// 採用した結果を表す
     /// </summary>
     public sealed class YakuEvaluationResult
     {
@@ -29,18 +30,24 @@ namespace Mahjong.Model.Evaluation
         /// 採用された分解パターン
         /// </summary>
         public HandDecomposition BestDecomposition { get; }
+        /// <summary>
+        /// 採用された分解パターンの符
+        /// 役満の場合は符を使わないため 0（FuCalculator のセンチネル値をそのまま反映）
+        /// </summary>
+        public int Fu { get; }
 
 
         // ========================================
         // コンストラクタ
         // ========================================
         public YakuEvaluationResult(
-            IReadOnlyList<YakuResult> yaku, int totalHan, bool isYakuman, HandDecomposition bestDecomposition)
+            IReadOnlyList<YakuResult> yaku, int totalHan, bool isYakuman, HandDecomposition bestDecomposition, int fu)
         {
             Yaku = yaku;
             TotalHan = totalHan;
             IsYakuman = isYakuman;
             BestDecomposition = bestDecomposition;
+            Fu = fu;
         }
     }
 }
