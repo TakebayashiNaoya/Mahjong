@@ -86,6 +86,24 @@ namespace Mahjong.Model.Cpu
 
             return topTier[random.Next(topTier.Count)].Tile;
         }
+        /// <summary>
+        /// 打牌後もテンパイを維持できる牌をすべて列挙する
+        /// リーチ宣言時、人間プレイヤーに提示する打牌候補を絞り込むために使用する
+        /// </summary>
+        /// <param name="hand">現在の手牌（ツモ牌を持つ状態）</param>
+        /// <returns>打牌後もシャンテン数が0になる牌の一覧（1種類につき代表牌1枚）</returns>
+        /// <exception cref="ArgumentNullException">hand が null の場合</exception>
+        public static IReadOnlyList<Tile> FindTenpaiKeepingDiscards(Hand hand)
+        {
+            if (hand == null)
+            {
+                throw new ArgumentNullException(nameof(hand), "hand が null です");
+            }
+
+            return DistinctByKind(hand.GetClosedTiles())
+                .Where(t => CalculateShantenAfterDiscard(hand, t) == 0)
+                .ToList();
+        }
 
 
         // ========================================

@@ -1,12 +1,17 @@
+using System;
+using System.Collections.Generic;
 using Mahjong.Presenter;
 using R3;
 using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.InputSystem.UI;
 using UnityEngine.UI;
 
 namespace Mahjong.View
 {
     /// <summary>
-    /// GamePresenter.DisplayText を購読して画面全体に表示する、テキストのみの最小View
+    /// GamePresenter.DisplayText を購読して画面全体に表示し、
+    /// GamePresenter.Human が公開する選択肢をボタンとして表示する最小View
     /// シーンに何も配置しなくても、再生するだけで自分自身とGamePresenterを生成する
     /// </summary>
     public sealed class InGameView : MonoBehaviour
@@ -23,9 +28,21 @@ namespace Mahjong.View
         /// </summary>
         private static readonly Color TextColor = Color.white;
         /// <summary>
+        /// ボタンの背景色
+        /// </summary>
+        private static readonly Color ButtonColor = new(0.25f, 0.45f, 0.25f, 0.95f);
+        /// <summary>
         /// 表示文字のサイズ
         /// </summary>
         private const int FONT_SIZE = 20;
+        /// <summary>
+        /// ボタン文字のサイズ
+        /// </summary>
+        private const int BUTTON_FONT_SIZE = 16;
+        /// <summary>
+        /// ボタンパネルの高さ
+        /// </summary>
+        private const float BUTTON_PANEL_HEIGHT = 64f;
         /// <summary>
         /// Canvasの基準解像度
         /// </summary>
@@ -43,6 +60,14 @@ namespace Mahjong.View
         /// 表示用テキスト
         /// </summary>
         private Text _displayText;
+        /// <summary>
+        /// 選択肢ボタンを並べるパネル
+        /// </summary>
+        private RectTransform _buttonPanel;
+        /// <summary>
+        /// 現在表示中のボタン（次の選択肢に差し替える際にまとめて破棄する）
+        /// </summary>
+        private readonly List<GameObject> _activeButtons = new();
 
 
         // ========================================
@@ -58,6 +83,22 @@ namespace Mahjong.View
             var root = new GameObject("MahjongGameRoot");
             root.AddComponent<GamePresenter>();
             root.AddComponent<InGameView>();
+
+            EnsureEventSystemExists();
+        }
+        /// <summary>
+        /// ボタンのクリックを受け付けるために EventSystem が必要なため、無ければ生成する
+        /// このプロジェクトは Active Input Handling が新Input Systemのみのため、
+        /// 旧来の StandaloneInputModule ではなく InputSystemUIInputModule を使う
+        /// </summary>
+        private static void EnsureEventSystemExists()
+        {
+            if (FindFirstObjectByType<EventSystem>() != null)
+            {
+                return;
+            }
+
+            new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
         }
 
 
@@ -73,6 +114,63 @@ namespace Mahjong.View
         private void Start()
         {
             _presenter.DisplayText.Subscribe(text => _displayText.text = text).AddTo(this);
+            _presenter.Human.IsPendingRiichiChoice.Subscribe(OnRiichiChoicePending).AddTo(this);
+            _presenter.Human.PendingDiscardChoices.Subscribe(OnDiscardChoicesPending).AddTo(this);
+            _presenter.Human.PendingCallChoices.Subscribe(OnCallChoicesPending).AddTo(this);
+        }
+
+
+        // ========================================
+        // プライベートメソッド（選択肢の表示）
+        // ========================================
+        /// <summary>
+        /// リーチ宣言の確認ボタンを表示する
+        /// </summary>
+        private void OnRiichiChoicePending(bool isPending)
+        {
+            ClearButtons();
+
+            if (!isPending)
+            {
+                return;
+            }
+
+            CreateButton("リーチする", () => _presenter.Human.SubmitRiichi(true));
+            CreateButton("リーチしない", () => _presenter.Human.SubmitRiichi(false));
+        }
+        /// <summary>
+        /// 打牌の候補ボタンを表示する
+        /// </summary>
+        private void OnDiscardChoicesPending(IReadOnlyList<DiscardChoice> choices)
+        {
+            ClearButtons();
+
+            if (choices == null)
+            {
+                return;
+            }
+
+            foreach (var choice in choices)
+            {
+                CreateButton(choice.Label, () => _presenter.Human.SubmitDiscard(choice));
+            }
+        }
+        /// <summary>
+        /// 宣言（ポン・チー・カン・スルー）の候補ボタンを表示する
+        /// </summary>
+        private void OnCallChoicesPending(IReadOnlyList<CallChoice> choices)
+        {
+            ClearButtons();
+
+            if (choices == null)
+            {
+                return;
+            }
+
+            foreach (var choice in choices)
+            {
+                CreateButton(choice.Label, () => _presenter.Human.SubmitCall(choice));
+            }
         }
 
 
@@ -80,13 +178,13 @@ namespace Mahjong.View
         // プライベートメソッド（UI構築）
         // ========================================
         /// <summary>
-        /// Canvas・背景パネル・全画面テキストをコードのみで組み立てる
+        /// Canvas・背景パネル・全画面テキスト・ボタンパネルをコードのみで組み立てる
         /// TextMeshPro はフォントアセットのInspector設定が必要になるため、
         /// 組み込みフォントだけで完結するレガシーuGUI Textを使う
         /// </summary>
         private void BuildUi()
         {
-            var canvasGameObject = new GameObject("Canvas", typeof(Canvas), typeof(CanvasScaler));
+            var canvasGameObject = new GameObject("Canvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
             canvasGameObject.transform.SetParent(transform, false);
 
             var canvas = canvasGameObject.GetComponent<Canvas>();
@@ -114,8 +212,74 @@ namespace Mahjong.View
 
             var rect = _displayText.rectTransform;
             StretchToParent(rect);
-            rect.offsetMin += new Vector2(16f, 16f);
+            rect.offsetMin += new Vector2(16f, BUTTON_PANEL_HEIGHT + 16f);
             rect.offsetMax -= new Vector2(16f, 16f);
+
+            BuildButtonPanel(canvasGameObject.transform);
+        }
+        /// <summary>
+        /// 画面下部に選択肢ボタンを並べるパネルを組み立てる
+        /// </summary>
+        private void BuildButtonPanel(Transform canvasTransform)
+        {
+            var panelGameObject = new GameObject("ButtonPanel", typeof(RectTransform), typeof(HorizontalLayoutGroup));
+            panelGameObject.transform.SetParent(canvasTransform, false);
+
+            _buttonPanel = panelGameObject.GetComponent<RectTransform>();
+            _buttonPanel.anchorMin = new Vector2(0f, 0f);
+            _buttonPanel.anchorMax = new Vector2(1f, 0f);
+            _buttonPanel.pivot = new Vector2(0.5f, 0f);
+            _buttonPanel.sizeDelta = new Vector2(0f, BUTTON_PANEL_HEIGHT);
+            _buttonPanel.anchoredPosition = new Vector2(0f, 8f);
+
+            var layout = panelGameObject.GetComponent<HorizontalLayoutGroup>();
+            layout.spacing = 8f;
+            layout.padding = new RectOffset(8, 8, 8, 8);
+            layout.childForceExpandWidth = false;
+            layout.childForceExpandHeight = false;
+            layout.childAlignment = TextAnchor.MiddleCenter;
+        }
+        /// <summary>
+        /// 選択肢ボタンを1つ作る
+        /// </summary>
+        private void CreateButton(string label, Action onClick)
+        {
+            var buttonGameObject = new GameObject($"Button_{label}", typeof(Image), typeof(Button), typeof(LayoutElement));
+            buttonGameObject.transform.SetParent(_buttonPanel, false);
+
+            var image = buttonGameObject.GetComponent<Image>();
+            image.color = ButtonColor;
+
+            var layoutElement = buttonGameObject.GetComponent<LayoutElement>();
+            layoutElement.minWidth = 90f;
+            layoutElement.minHeight = BUTTON_PANEL_HEIGHT - 16f;
+
+            var button = buttonGameObject.GetComponent<Button>();
+            button.onClick.AddListener(() => onClick());
+
+            var textGameObject = new GameObject("Text", typeof(Text));
+            textGameObject.transform.SetParent(buttonGameObject.transform, false);
+            var text = textGameObject.GetComponent<Text>();
+            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            text.fontSize = BUTTON_FONT_SIZE;
+            text.color = TextColor;
+            text.alignment = TextAnchor.MiddleCenter;
+            text.text = label;
+            StretchToParent(text.rectTransform);
+
+            _activeButtons.Add(buttonGameObject);
+        }
+        /// <summary>
+        /// 表示中のボタンをすべて破棄する
+        /// </summary>
+        private void ClearButtons()
+        {
+            foreach (var button in _activeButtons)
+            {
+                Destroy(button);
+            }
+
+            _activeButtons.Clear();
         }
         /// <summary>
         /// RectTransformを親いっぱいに広げる

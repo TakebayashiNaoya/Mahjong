@@ -48,6 +48,11 @@ namespace Mahjong.Presenter
         /// </summary>
         [SerializeField]
         private int _roundIntervalMilliseconds = 2000;
+        /// <summary>
+        /// 人間が操作する席（それ以外はすべてCPU）
+        /// </summary>
+        [SerializeField]
+        private int _humanPlayerIndex = 0;
 
 
         // ========================================
@@ -57,16 +62,20 @@ namespace Mahjong.Presenter
         /// 画面表示用の整形済みテキスト（ヘッダー・各プレイヤー・ログをすべて含む）
         /// </summary>
         public ReactiveProperty<string> DisplayText { get; } = new(string.Empty);
+        /// <summary>
+        /// 人間プレイヤーの意思決定窓口
+        /// View層はこれを購読し、ボタン操作を SubmitXxx で送り返す
+        /// </summary>
+        public HumanPlayerController Human { get; } = new();
 
 
         // ========================================
         // フィールド
         // ========================================
         /// <summary>
-        /// 打牌のタイブレークに使う乱数生成器（Model層の山の乱数とは別物）
-        /// UnityEngine.Random と名前が衝突するため System.Random と明示する
+        /// 人間以外の席の意思決定を担う（全席で共有する）
         /// </summary>
-        private readonly System.Random _random = new();
+        private readonly CpuPlayerController _cpu = new();
         /// <summary>
         /// 直近のイベントログ
         /// </summary>
@@ -150,7 +159,7 @@ namespace Mahjong.Presenter
 
                 if (_round.Phase == TurnPhase.AwaitingDiscard)
                 {
-                    var result = ProcessDiscardPhase();
+                    var result = await ProcessDiscardPhaseAsync(ct);
 
                     if (result != null)
                     {
@@ -164,7 +173,7 @@ namespace Mahjong.Presenter
 
                 if (_round.Phase == TurnPhase.AwaitingReactions)
                 {
-                    var result = ProcessReactionPhase();
+                    var result = await ProcessReactionPhaseAsync(ct);
 
                     if (result != null)
                     {
@@ -178,9 +187,10 @@ namespace Mahjong.Presenter
         }
         /// <summary>
         /// 現在のプレイヤーのツモ番の判断（ツモ和了・九種九牌・北抜き・リーチ・打牌）を行う
+        /// ツモ和了・九種九牌・北抜きは席によらず CpuStrategy の既定判断のまま自動で行う
         /// </summary>
         /// <returns>局が終了した場合は結果を返す。継続する場合は null</returns>
-        private RoundResult ProcessDiscardPhase()
+        private async UniTask<RoundResult> ProcessDiscardPhaseAsync(CancellationToken ct)
         {
             var playerIndex = _round.CurrentPlayerIndex;
 
@@ -203,13 +213,15 @@ namespace Mahjong.Presenter
                 return null;
             }
 
-            if (_round.CanDeclareRiichi() && CpuStrategy.ShouldDeclareRiichi(_round, playerIndex, DIFFICULTY))
+            var controller = GetController(playerIndex);
+
+            if (_round.CanDeclareRiichi() && await controller.ShouldDeclareRiichiAsync(_round, playerIndex, ct))
             {
                 _round.DeclareRiichi();
                 AppendLog($"P{playerIndex} リーチ");
             }
 
-            var discard = CpuStrategy.ChooseDiscard(_round, playerIndex, DIFFICULTY, _random);
+            var discard = await controller.ChooseDiscardAsync(_round, playerIndex, ct);
             _round.Discard(discard);
             AppendLog($"P{playerIndex} 打: {discard}");
             return null;
@@ -218,7 +230,7 @@ namespace Mahjong.Presenter
         /// 直前の捨て牌に対する他家の反応（ロン・ポン・カン・チー）を解決する
         /// </summary>
         /// <returns>局が終了した場合は結果を返す。継続する場合は null</returns>
-        private RoundResult ProcessReactionPhase()
+        private async UniTask<RoundResult> ProcessReactionPhaseAsync(CancellationToken ct)
         {
             var discarderIndex = _round.CurrentPlayerIndex;
             var discardedTile = _round.Players[discarderIndex].Discards[^1];
@@ -228,7 +240,8 @@ namespace Mahjong.Presenter
 
             foreach (var playerIndex in options.Select(o => o.PlayerIndex).Distinct())
             {
-                var declared = CpuStrategy.ChooseCall(_round, playerIndex, options, DIFFICULTY);
+                var myOptions = options.Where(o => o.PlayerIndex == playerIndex).ToList();
+                var declared = await GetController(playerIndex).ChooseCallAsync(_round, playerIndex, myOptions, ct);
 
                 if (declared != null)
                 {
@@ -238,6 +251,13 @@ namespace Mahjong.Presenter
             }
 
             return _round.ResolveCalls(declarations);
+        }
+        /// <summary>
+        /// 席番号から意思決定の窓口を選ぶ
+        /// </summary>
+        private IPlayerController GetController(int playerIndex)
+        {
+            return playerIndex == _humanPlayerIndex ? Human : _cpu;
         }
         /// <summary>
         /// 指定時間だけ待つ
