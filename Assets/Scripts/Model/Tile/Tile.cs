@@ -70,9 +70,15 @@
         /// <summary>
         /// 同じ種類の牌かどうかを判定する
         /// 赤ドラは通常の5と同じ牌として扱う
+        /// 字牌は Number が全種共通で0のため、Suit だけでは区別できない。Id まで比較する
         /// </summary>
         public bool IsSameType(Tile other)
         {
+            if (Suit == TileSuit.Jihai)
+            {
+                return other.Suit == TileSuit.Jihai && Id == other.Id;
+            }
+
             return Suit == other.Suit && Number == other.Number;
         }
         /// <summary>
