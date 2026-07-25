@@ -47,6 +47,11 @@ namespace Mahjong.View
         /// Canvasの基準解像度
         /// </summary>
         private static readonly Vector2 ReferenceResolution = new(1280f, 720f);
+        /// <summary>
+        /// テキスト表示パネルが占める画面下端からの割合
+        /// 残りの下部領域はP0の3D手牌表示に充てる
+        /// </summary>
+        private const float TEXT_PANEL_BOTTOM = 0.35f;
 
 
         // ========================================
@@ -83,6 +88,7 @@ namespace Mahjong.View
             var root = new GameObject("MahjongGameRoot");
             root.AddComponent<GamePresenter>();
             root.AddComponent<InGameView>();
+            root.AddComponent<HandTileFieldView>();
 
             EnsureEventSystemExists();
         }
@@ -198,7 +204,7 @@ namespace Mahjong.View
             backgroundGameObject.transform.SetParent(canvasGameObject.transform, false);
             var background = backgroundGameObject.GetComponent<Image>();
             background.color = BackgroundColor;
-            StretchToParent(background.rectTransform);
+            StretchToTopArea(background.rectTransform);
 
             var textGameObject = new GameObject("DisplayText", typeof(Text));
             textGameObject.transform.SetParent(canvasGameObject.transform, false);
@@ -211,8 +217,8 @@ namespace Mahjong.View
             _displayText.verticalOverflow = VerticalWrapMode.Overflow;
 
             var rect = _displayText.rectTransform;
-            StretchToParent(rect);
-            rect.offsetMin += new Vector2(16f, BUTTON_PANEL_HEIGHT + 16f);
+            StretchToTopArea(rect);
+            rect.offsetMin += new Vector2(16f, 16f);
             rect.offsetMax -= new Vector2(16f, 16f);
 
             BuildButtonPanel(canvasGameObject.transform);
@@ -287,6 +293,17 @@ namespace Mahjong.View
         private static void StretchToParent(RectTransform rect)
         {
             rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+        }
+        /// <summary>
+        /// RectTransformを画面上部（TEXT_PANEL_BOTTOM〜100%）に広げる
+        /// 残した下部領域は HandTileFieldView がP0の3D手牌を表示するのに使う
+        /// </summary>
+        private static void StretchToTopArea(RectTransform rect)
+        {
+            rect.anchorMin = new Vector2(0f, TEXT_PANEL_BOTTOM);
             rect.anchorMax = Vector2.one;
             rect.offsetMin = Vector2.zero;
             rect.offsetMax = Vector2.zero;
