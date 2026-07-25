@@ -16,6 +16,10 @@ namespace Mahjong.Presenter
         /// </summary>
         public string Label { get; }
         /// <summary>
+        /// 牌の表示用データ（アイコン表示に使う）
+        /// </summary>
+        public TileView TileView { get; }
+        /// <summary>
         /// 実際に打牌する牌（Presenter層内でのみ使用する）
         /// </summary>
         internal Tile Tile { get; }
@@ -28,6 +32,7 @@ namespace Mahjong.Presenter
         {
             Tile = tile;
             Label = tile.ToString();
+            TileView = TileView.FromModel(tile);
         }
     }
 }

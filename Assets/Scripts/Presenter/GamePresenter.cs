@@ -6,7 +6,6 @@ using Cysharp.Threading.Tasks;
 using Mahjong.Model.Cpu;
 using Mahjong.Model.Game;
 using Mahjong.Model.Hands;
-using Mahjong.Model.Tiles;
 using R3;
 using UnityEngine;
 
@@ -351,46 +350,14 @@ namespace Mahjong.Presenter
         private IReadOnlyList<TileView> BuildHumanHandTiles()
         {
             var hand = _game.Players[_humanPlayerIndex].Hand;
-            var tiles = hand.Tiles.Select(ToTileView).ToList();
+            var tiles = hand.Tiles.Select(TileView.FromModel).ToList();
 
             if (hand.DrawnTile != null)
             {
-                tiles.Add(ToTileView(hand.DrawnTile));
+                tiles.Add(TileView.FromModel(hand.DrawnTile));
             }
 
             return tiles;
-        }
-        /// <summary>
-        /// Model層の牌をView層に安全なTileViewへ変換する
-        /// </summary>
-        private static TileView ToTileView(Tile tile)
-        {
-            if (tile.Suit != TileSuit.Jihai)
-            {
-                var suit = tile.Suit switch
-                {
-                    TileSuit.Manzu => TileSuitView.Manzu,
-                    TileSuit.Pinzu => TileSuitView.Pinzu,
-                    TileSuit.Souzu => TileSuitView.Souzu,
-                    _ => throw new System.InvalidOperationException($"未対応のTileSuitです: {tile.Suit}"),
-                };
-
-                return new TileView(suit, tile.Number, null, tile.IsRed);
-            }
-
-            var honor = tile.Id switch
-            {
-                TileId.East => HonorTileView.East,
-                TileId.South => HonorTileView.South,
-                TileId.West => HonorTileView.West,
-                TileId.North => HonorTileView.North,
-                TileId.Haku => HonorTileView.Haku,
-                TileId.Hatsu => HonorTileView.Hatsu,
-                TileId.Chun => HonorTileView.Chun,
-                _ => throw new System.InvalidOperationException($"未対応の字牌IDです: {tile.Id}"),
-            };
-
-            return new TileView(TileSuitView.Jihai, 0, honor, false);
         }
         /// <summary>
         /// 手牌を文字列化する（門前牌・ツモ牌・副露をすべて含む）

@@ -44,14 +44,13 @@ namespace Mahjong.View
         /// </summary>
         private const float BUTTON_PANEL_HEIGHT = 64f;
         /// <summary>
+        /// 手牌アイコンパネルの高さ
+        /// </summary>
+        private const float HAND_PANEL_HEIGHT = 100f;
+        /// <summary>
         /// Canvasの基準解像度
         /// </summary>
         private static readonly Vector2 ReferenceResolution = new(1280f, 720f);
-        /// <summary>
-        /// テキスト表示パネルが占める画面下端からの割合
-        /// 残りの下部領域はP0の3D手牌表示に充てる
-        /// </summary>
-        private const float TEXT_PANEL_BOTTOM = 0.35f;
 
 
         // ========================================
@@ -70,9 +69,17 @@ namespace Mahjong.View
         /// </summary>
         private RectTransform _buttonPanel;
         /// <summary>
+        /// 手牌アイコンを並べるパネル
+        /// </summary>
+        private RectTransform _handPanel;
+        /// <summary>
         /// 現在表示中のボタン（次の選択肢に差し替える際にまとめて破棄する）
         /// </summary>
         private readonly List<GameObject> _activeButtons = new();
+        /// <summary>
+        /// 現在表示中の手牌アイコン（手牌が更新されるたびにまとめて破棄する）
+        /// </summary>
+        private readonly List<GameObject> _activeHandTiles = new();
 
 
         // ========================================
@@ -88,7 +95,6 @@ namespace Mahjong.View
             var root = new GameObject("MahjongGameRoot");
             root.AddComponent<GamePresenter>();
             root.AddComponent<InGameView>();
-            root.AddComponent<HandTileFieldView>();
 
             EnsureEventSystemExists();
         }
@@ -121,8 +127,9 @@ namespace Mahjong.View
         {
             _presenter.DisplayText.Subscribe(text => _displayText.text = text).AddTo(this);
             _presenter.Human.IsPendingRiichiChoice.Subscribe(OnRiichiChoicePending).AddTo(this);
-            _presenter.Human.PendingDiscardChoices.Subscribe(OnDiscardChoicesPending).AddTo(this);
+            _presenter.Human.PendingDiscardChoices.Subscribe(_ => RefreshHandRow()).AddTo(this);
             _presenter.Human.PendingCallChoices.Subscribe(OnCallChoicesPending).AddTo(this);
+            _presenter.HumanHandTiles.Subscribe(_ => RefreshHandRow()).AddTo(this);
         }
 
 
@@ -145,23 +152,6 @@ namespace Mahjong.View
             CreateButton("リーチしない", () => _presenter.Human.SubmitRiichi(false));
         }
         /// <summary>
-        /// 打牌の候補ボタンを表示する
-        /// </summary>
-        private void OnDiscardChoicesPending(IReadOnlyList<DiscardChoice> choices)
-        {
-            ClearButtons();
-
-            if (choices == null)
-            {
-                return;
-            }
-
-            foreach (var choice in choices)
-            {
-                CreateButton(choice.Label, () => _presenter.Human.SubmitDiscard(choice));
-            }
-        }
-        /// <summary>
         /// 宣言（ポン・チー・カン・スルー）の候補ボタンを表示する
         /// </summary>
         private void OnCallChoicesPending(IReadOnlyList<CallChoice> choices)
@@ -177,6 +167,82 @@ namespace Mahjong.View
             {
                 CreateButton(choice.Label, () => _presenter.Human.SubmitCall(choice));
             }
+        }
+
+
+        // ========================================
+        // プライベートメソッド（手牌の表示）
+        // ========================================
+        /// <summary>
+        /// 手牌アイコンの行を作り直す
+        /// 打牌選択が発生中なら候補牌をクリック可能なアイコンとして、
+        /// そうでなければ現在の手牌をクリック不可のアイコンとして並べる
+        /// </summary>
+        private void RefreshHandRow()
+        {
+            ClearHandTiles();
+
+            var pendingDiscardChoices = _presenter.Human.PendingDiscardChoices.Value;
+
+            if (pendingDiscardChoices != null)
+            {
+                foreach (var choice in pendingDiscardChoices)
+                {
+                    CreateHandTileIcon(choice.TileView, () => _presenter.Human.SubmitDiscard(choice));
+                }
+
+                return;
+            }
+
+            var tiles = _presenter.HumanHandTiles.Value;
+
+            if (tiles == null)
+            {
+                return;
+            }
+
+            foreach (var tile in tiles)
+            {
+                CreateHandTileIcon(tile, null);
+            }
+        }
+        /// <summary>
+        /// 手牌アイコンを1つ作る
+        /// </summary>
+        /// <param name="tile">表示する牌</param>
+        /// <param name="onClick">クリック時の処理。nullの場合はクリック不可の表示のみになる</param>
+        private void CreateHandTileIcon(TileView tile, Action onClick)
+        {
+            var tileGameObject = new GameObject("HandTile", typeof(Image), typeof(LayoutElement));
+            tileGameObject.transform.SetParent(_handPanel, false);
+
+            var image = tileGameObject.GetComponent<Image>();
+            image.sprite = TileIconCache.GetSprite(tile);
+            image.preserveAspect = true;
+
+            var layoutElement = tileGameObject.GetComponent<LayoutElement>();
+            layoutElement.minWidth = HAND_PANEL_HEIGHT - 16f;
+            layoutElement.minHeight = HAND_PANEL_HEIGHT - 16f;
+
+            if (onClick != null)
+            {
+                var button = tileGameObject.AddComponent<Button>();
+                button.onClick.AddListener(() => onClick());
+            }
+
+            _activeHandTiles.Add(tileGameObject);
+        }
+        /// <summary>
+        /// 表示中の手牌アイコンをすべて破棄する
+        /// </summary>
+        private void ClearHandTiles()
+        {
+            foreach (var tileGameObject in _activeHandTiles)
+            {
+                Destroy(tileGameObject);
+            }
+
+            _activeHandTiles.Clear();
         }
 
 
@@ -204,7 +270,7 @@ namespace Mahjong.View
             backgroundGameObject.transform.SetParent(canvasGameObject.transform, false);
             var background = backgroundGameObject.GetComponent<Image>();
             background.color = BackgroundColor;
-            StretchToTopArea(background.rectTransform);
+            StretchToParent(background.rectTransform);
 
             var textGameObject = new GameObject("DisplayText", typeof(Text));
             textGameObject.transform.SetParent(canvasGameObject.transform, false);
@@ -217,11 +283,12 @@ namespace Mahjong.View
             _displayText.verticalOverflow = VerticalWrapMode.Overflow;
 
             var rect = _displayText.rectTransform;
-            StretchToTopArea(rect);
-            rect.offsetMin += new Vector2(16f, 16f);
+            StretchToParent(rect);
+            rect.offsetMin += new Vector2(16f, BUTTON_PANEL_HEIGHT + HAND_PANEL_HEIGHT + 16f);
             rect.offsetMax -= new Vector2(16f, 16f);
 
             BuildButtonPanel(canvasGameObject.transform);
+            BuildHandPanel(canvasGameObject.transform);
         }
         /// <summary>
         /// 画面下部に選択肢ボタンを並べるパネルを組み立てる
@@ -240,6 +307,28 @@ namespace Mahjong.View
 
             var layout = panelGameObject.GetComponent<HorizontalLayoutGroup>();
             layout.spacing = 8f;
+            layout.padding = new RectOffset(8, 8, 8, 8);
+            layout.childForceExpandWidth = false;
+            layout.childForceExpandHeight = false;
+            layout.childAlignment = TextAnchor.MiddleCenter;
+        }
+        /// <summary>
+        /// ボタンパネルのすぐ上に、手牌アイコンを並べるパネルを組み立てる
+        /// </summary>
+        private void BuildHandPanel(Transform canvasTransform)
+        {
+            var panelGameObject = new GameObject("HandPanel", typeof(RectTransform), typeof(HorizontalLayoutGroup));
+            panelGameObject.transform.SetParent(canvasTransform, false);
+
+            _handPanel = panelGameObject.GetComponent<RectTransform>();
+            _handPanel.anchorMin = new Vector2(0f, 0f);
+            _handPanel.anchorMax = new Vector2(1f, 0f);
+            _handPanel.pivot = new Vector2(0.5f, 0f);
+            _handPanel.sizeDelta = new Vector2(0f, HAND_PANEL_HEIGHT);
+            _handPanel.anchoredPosition = new Vector2(0f, BUTTON_PANEL_HEIGHT + 16f);
+
+            var layout = panelGameObject.GetComponent<HorizontalLayoutGroup>();
+            layout.spacing = 4f;
             layout.padding = new RectOffset(8, 8, 8, 8);
             layout.childForceExpandWidth = false;
             layout.childForceExpandHeight = false;
@@ -293,17 +382,6 @@ namespace Mahjong.View
         private static void StretchToParent(RectTransform rect)
         {
             rect.anchorMin = Vector2.zero;
-            rect.anchorMax = Vector2.one;
-            rect.offsetMin = Vector2.zero;
-            rect.offsetMax = Vector2.zero;
-        }
-        /// <summary>
-        /// RectTransformを画面上部（TEXT_PANEL_BOTTOM〜100%）に広げる
-        /// 残した下部領域は HandTileFieldView がP0の3D手牌を表示するのに使う
-        /// </summary>
-        private static void StretchToTopArea(RectTransform rect)
-        {
-            rect.anchorMin = new Vector2(0f, TEXT_PANEL_BOTTOM);
             rect.anchorMax = Vector2.one;
             rect.offsetMin = Vector2.zero;
             rect.offsetMax = Vector2.zero;
