@@ -95,6 +95,7 @@ namespace Mahjong.View
             var root = new GameObject("MahjongGameRoot");
             root.AddComponent<GamePresenter>();
             root.AddComponent<InGameView>();
+            root.AddComponent<DiscardFieldView>();
 
             EnsureEventSystemExists();
         }
