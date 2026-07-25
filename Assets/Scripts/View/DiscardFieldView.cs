@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Linq;
 using Mahjong.Presenter;
 using R3;
 using UnityEngine;
@@ -10,6 +9,7 @@ namespace Mahjong.View
     /// GamePresenter.PlayerDiscards を購読し、全プレイヤーの河（捨て牌）を3D牌メッシュで卓上に表示する
     /// PlayerDiscardsは自分から見た相対位置（0=自分, 1=下家, 2=対面, 3=上家）で並んでいるため、
     /// 「自分（offset=0）の並べ方」を基準に、卓の中心を軸に90度ずつ回転させて他の席の配置を求める
+    /// 既に配置済みの牌には触れず、増えた分だけを追加する（配置済みの牌がジッターも含めて動かないようにするため）
     /// </summary>
     public sealed class DiscardFieldView : MonoBehaviour
     {
@@ -49,7 +49,15 @@ namespace Mahjong.View
         /// 逆算した推定値。河の牌は寝かせて置くため、ピボットからの底面までの距離は
         /// 牌ごとに実測したバウンディングボックス（localBounds.min.y）から別途補正する
         /// </summary>
-        private const float TABLE_SURFACE_Y = 0f;
+        private const float TABLE_SURFACE_Y = 0.0f;
+        /// <summary>
+        /// 牌の位置に加えるランダムなずれの最大幅（機械的に整列しすぎないようにする）
+        /// </summary>
+        private const float POSITION_JITTER_RANGE = 0.015f;
+        /// <summary>
+        /// 牌の向きに加えるランダムな回転の最大幅（度）
+        /// </summary>
+        private const float ROTATION_JITTER_DEGREES = 3.0f;
 
 
         // ========================================
@@ -60,13 +68,19 @@ namespace Mahjong.View
         /// </summary>
         private GamePresenter _presenter;
         /// <summary>
-        /// 牌GameObjectの親（河が更新されるたびに子をすべて作り直す）
+        /// 牌GameObjectの親
         /// </summary>
         private Transform _fieldRoot;
         /// <summary>
-        /// 現在表示中の牌GameObject（次の更新でまとめて破棄する）
+        /// 席（自分から見た相対位置）ごとに配置済みの牌GameObject
+        /// 既に配置した牌は動かさず、増えた分だけをリストへ追加していく
         /// </summary>
-        private readonly List<GameObject> _activeTileObjects = new();
+        private readonly List<List<GameObject>> _seatTileObjects = new();
+        /// <summary>
+        /// 牌1枚分の基準サイズ（幅・奥行き）
+        /// 全種類の牌でほぼ同じ実寸のため、最初に配置した1枚から計測した値を使い回す
+        /// </summary>
+        private Bounds? _referenceTileBounds;
 
 
         // ========================================
@@ -91,32 +105,47 @@ namespace Mahjong.View
         // プライベートメソッド（河の描画）
         // ========================================
         /// <summary>
-        /// 河が更新されるたびに、全プレイヤー分の牌を作り直して並べ直す
+        /// 河が更新されるたびに、増えた分の牌だけを追加で配置する
         /// </summary>
         private void OnPlayerDiscardsChanged(IReadOnlyList<IReadOnlyList<TileView>> playerDiscards)
         {
-            ClearTiles();
-
             if (playerDiscards == null || playerDiscards.Count == 0)
             {
                 return;
+            }
+
+            while (_seatTileObjects.Count < playerDiscards.Count)
+            {
+                _seatTileObjects.Add(new List<GameObject>());
             }
 
             var tableBounds = ResolveTableBounds();
 
             for (var offset = 0; offset < playerDiscards.Count; offset++)
             {
-                PlaceSeatDiscards(playerDiscards[offset], offset, tableBounds);
+                UpdateSeatDiscards(playerDiscards[offset], offset, tableBounds);
             }
         }
         /// <summary>
-        /// 1人分の河を配置する
-        /// 「自分（offset=0）が手前で正面を向いている」座標系でレイアウトを組み立てた後、
-        /// 卓の中心を軸に90度×offset回転させて、その席の位置・向きに変換する
+        /// 1人分の河を最新の状態に合わせる
+        /// 既に配置済みの牌はそのままにし、末尾に増えた牌だけを新しく配置する
+        /// 局が変わって河が短くなった（リセットされた）場合のみ、すべて作り直す
         /// </summary>
-        private void PlaceSeatDiscards(IReadOnlyList<TileView> discards, int offset, Bounds tableBounds)
+        private void UpdateSeatDiscards(IReadOnlyList<TileView> discards, int offset, Bounds tableBounds)
         {
-            if (discards == null || discards.Count == 0)
+            var existingTiles = _seatTileObjects[offset];
+
+            if (discards.Count < existingTiles.Count)
+            {
+                foreach (var tileObject in existingTiles)
+                {
+                    Destroy(tileObject);
+                }
+
+                existingTiles.Clear();
+            }
+
+            if (discards.Count == existingTiles.Count)
             {
                 return;
             }
@@ -129,95 +158,69 @@ namespace Mahjong.View
             var facingRotation = Quaternion.Euler(0f, 90f * offset + 180f, 0f);
             var localNearZ = -tableBounds.extents.z + tableBounds.size.z * NEAR_EDGE_INSET_FRACTION;
 
-            // 1周目: 生成とバウンディングボックス計測、行・列への割り振りだけ行う
-            // （座標系はまだ回転させていない「自分が手前」の基準のまま）
-            var placements = new List<(GameObject tileObject, Bounds localBounds, int row)>();
-
-            for (var i = 0; i < discards.Count; i++)
+            for (var index = existingTiles.Count; index < discards.Count; index++)
             {
-                var tileObject = InstantiateDiscardTile(discards[i], out var localBounds);
+                var tileObject = PlaceDiscardTile(discards[index], index, positionRotation, facingRotation, localNearZ, tableBounds);
 
-                if (tileObject == null)
+                if (tileObject != null)
                 {
-                    continue;
-                }
-
-                placements.Add((tileObject, localBounds, i / TILES_PER_ROW));
-            }
-
-            if (placements.Count == 0)
-            {
-                return;
-            }
-
-            // 全行を「1行6枚分の幅」を基準に左揃えする（行ごとに中央揃えし直さない）
-            var referenceTileWidth = placements[0].localBounds.size.x;
-            var fullRowWidth = referenceTileWidth * (1f + TILE_MARGIN_FACTOR) * TILES_PER_ROW;
-            var rowStartX = -fullRowWidth * 0.5f;
-
-            // 2周目: 行ごとに左揃えで並べる。2行目以降は手前（自分側）へ積む
-            foreach (var rowGroup in placements.GroupBy(p => p.row).OrderBy(g => g.Key))
-            {
-                var tilesInRow = rowGroup.ToList();
-                var rowDepth = tilesInRow[0].localBounds.size.z * (1f + ROW_MARGIN_FACTOR);
-                var localZ = localNearZ - rowGroup.Key * rowDepth;
-
-                var offsetX = rowStartX;
-
-                foreach (var (tileObject, localBounds, _) in tilesInRow)
-                {
-                    var localX = offsetX + localBounds.size.x * 0.5f;
-                    var localPosition = new Vector3(localX, 0f, localZ);
-                    var rotatedOffset = positionRotation * localPosition;
-                    // 牌の底面が卓の設置面に揃うよう、実測バウンディングボックスからYを補正する
-                    // （ピボットが牌の中心にあるため、そのままだと底面が沈んだり浮いたりする）
-                    var restY = TABLE_SURFACE_Y - localBounds.min.y;
-                    var worldPosition = new Vector3(
-                        tableBounds.center.x + rotatedOffset.x,
-                        restY,
-                        tableBounds.center.z + rotatedOffset.z);
-
-                    tileObject.transform.position = worldPosition;
-                    tileObject.transform.rotation = facingRotation;
-
-                    offsetX += localBounds.size.x * (1f + TILE_MARGIN_FACTOR);
+                    existingTiles.Add(tileObject);
                 }
             }
         }
         /// <summary>
-        /// 牌1枚をロードして生成する
-        /// 姿勢を確定させる前（恒等回転）の状態でバウンディングボックスを計測して返す
-        /// （後段でどの席向けに回転させても、幅・奥行きの意味が変わらないようにするため）
+        /// 牌1枚を、河の中でのインデックス（行・列）から求めた位置に配置する
+        /// 「自分（offset=0）が手前で正面を向いている」座標系で位置を組み立てた後、
+        /// 卓の中心を軸に90度×offset回転させて、その席の位置・向きに変換する
         /// </summary>
-        private GameObject InstantiateDiscardTile(TileView tile, out Bounds localBounds)
+        private GameObject PlaceDiscardTile(TileView tile, int index, Quaternion positionRotation, Quaternion facingRotation, float localNearZ, Bounds tableBounds)
         {
             var prefab = TileMeshLibrary.LoadPrefab(tile);
 
             if (prefab == null)
             {
-                localBounds = default;
                 return null;
             }
 
             var tileObject = Instantiate(prefab, _fieldRoot);
             tileObject.transform.position = Vector3.zero;
             tileObject.transform.rotation = Quaternion.identity;
-            _activeTileObjects.Add(tileObject);
 
-            localBounds = TileMeshLibrary.MeasureBounds(tileObject);
+            // 姿勢を確定させる前（恒等回転）の状態でバウンディングボックスを計測する
+            // （後段でどの席向けに回転させても、幅・奥行きの意味が変わらないようにするため）
+            var localBounds = TileMeshLibrary.MeasureBounds(tileObject);
+            _referenceTileBounds ??= localBounds;
+            var reference = _referenceTileBounds.Value;
+
+            var tileWidth = reference.size.x * (1f + TILE_MARGIN_FACTOR);
+            var rowDepth = reference.size.z * (1f + ROW_MARGIN_FACTOR);
+            var rowStartX = -tileWidth * TILES_PER_ROW * 0.5f;
+
+            var row = index / TILES_PER_ROW;
+            var col = index % TILES_PER_ROW;
+            var localX = rowStartX + col * tileWidth + reference.size.x * 0.5f;
+            var localZ = localNearZ - row * rowDepth;
+
+            // 機械的に整列しすぎないよう、位置・向きに小さなランダムなずれを加える
+            // （このメソッドは新規に増えた牌にしか呼ばれないため、既に配置済みの牌のずれは変わらない）
+            var jitterX = Random.Range(-POSITION_JITTER_RANGE, POSITION_JITTER_RANGE);
+            var jitterZ = Random.Range(-POSITION_JITTER_RANGE, POSITION_JITTER_RANGE);
+            var localPosition = new Vector3(localX + jitterX, 0f, localZ + jitterZ);
+            var rotatedOffset = positionRotation * localPosition;
+
+            // 牌の底面が卓の設置面に揃うよう、実測バウンディングボックスからYを補正する
+            // （ピボットが牌の中心にあるため、そのままだと底面が沈んだり浮いたりする）
+            var restY = TABLE_SURFACE_Y - localBounds.min.y;
+            var worldPosition = new Vector3(
+                tableBounds.center.x + rotatedOffset.x,
+                restY,
+                tableBounds.center.z + rotatedOffset.z);
+            var jitterRotation = Quaternion.Euler(0f, Random.Range(-ROTATION_JITTER_DEGREES, ROTATION_JITTER_DEGREES), 0f);
+
+            tileObject.transform.position = worldPosition;
+            tileObject.transform.rotation = facingRotation * jitterRotation;
+
             return tileObject;
-        }
-        /// <summary>
-        /// 表示中の牌GameObjectをすべて破棄する
-        /// </summary>
-        private void ClearTiles()
-        {
-            foreach (var tileObject in _activeTileObjects)
-            {
-                Destroy(tileObject);
-            }
-
-            _activeTileObjects.Clear();
         }
         /// <summary>
         /// シーンの"table"オブジェクトの実測バウンディングボックスを返す
