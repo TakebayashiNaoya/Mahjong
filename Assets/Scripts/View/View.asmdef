@@ -4,7 +4,8 @@
     "references": [
         "Presenter",
         "R3.Unity",
-        "UnityEngine.UI"
+        "UnityEngine.UI",
+        "Unity.InputSystem"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
