@@ -5,4 +5,5 @@
   <Project Path="Assembly-CSharp-Editor.csproj" />
   <Project Path="Assembly-CSharp.csproj" />
   <Project Path="View.csproj" />
+  <Project Path="View.Editor.csproj" />
 </Solution>
