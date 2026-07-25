@@ -6,6 +6,7 @@ using Cysharp.Threading.Tasks;
 using Mahjong.Model.Cpu;
 using Mahjong.Model.Game;
 using Mahjong.Model.Hands;
+using Mahjong.Model.Tiles;
 using R3;
 using UnityEngine;
 
@@ -67,6 +68,11 @@ namespace Mahjong.Presenter
         /// View層はこれを購読し、ボタン操作を SubmitXxx で送り返す
         /// </summary>
         public HumanPlayerController Human { get; } = new();
+        /// <summary>
+        /// 人間プレイヤー自身の手牌（門前牌 + ツモ牌、この順）
+        /// 3D表示View層はこれを購読して牌モデルを並べる
+        /// </summary>
+        public ReactiveProperty<IReadOnlyList<TileView>> HumanHandTiles { get; } = new(System.Array.Empty<TileView>());
 
 
         // ========================================
@@ -316,9 +322,17 @@ namespace Mahjong.Presenter
                     var riichi = player.HandState.IsRiichi ? " [リーチ]" : "";
 
                     sb.AppendLine($"{marker}P{i} {player.SeatWind} {player.Score}点{riichi}");
-                    sb.AppendLine($"    手牌: {FormatHand(player.Hand)}");
+
+                    // P0の手牌は3D表示に譲るため、テキストとしては出力しない
+                    if (i != _humanPlayerIndex)
+                    {
+                        sb.AppendLine($"    手牌: {FormatHand(player.Hand)}");
+                    }
+
                     sb.AppendLine($"    河  : {string.Join(" ", player.Discards)}");
                 }
+
+                HumanHandTiles.Value = BuildHumanHandTiles();
             }
 
             sb.AppendLine();
@@ -330,6 +344,53 @@ namespace Mahjong.Presenter
             }
 
             DisplayText.Value = sb.ToString();
+        }
+        /// <summary>
+        /// 人間プレイヤーの手牌（門前牌 + ツモ牌）をTileViewのリストに変換する
+        /// </summary>
+        private IReadOnlyList<TileView> BuildHumanHandTiles()
+        {
+            var hand = _game.Players[_humanPlayerIndex].Hand;
+            var tiles = hand.Tiles.Select(ToTileView).ToList();
+
+            if (hand.DrawnTile != null)
+            {
+                tiles.Add(ToTileView(hand.DrawnTile));
+            }
+
+            return tiles;
+        }
+        /// <summary>
+        /// Model層の牌をView層に安全なTileViewへ変換する
+        /// </summary>
+        private static TileView ToTileView(Tile tile)
+        {
+            if (tile.Suit != TileSuit.Jihai)
+            {
+                var suit = tile.Suit switch
+                {
+                    TileSuit.Manzu => TileSuitView.Manzu,
+                    TileSuit.Pinzu => TileSuitView.Pinzu,
+                    TileSuit.Souzu => TileSuitView.Souzu,
+                    _ => throw new System.InvalidOperationException($"未対応のTileSuitです: {tile.Suit}"),
+                };
+
+                return new TileView(suit, tile.Number, null, tile.IsRed);
+            }
+
+            var honor = tile.Id switch
+            {
+                TileId.East => HonorTileView.East,
+                TileId.South => HonorTileView.South,
+                TileId.West => HonorTileView.West,
+                TileId.North => HonorTileView.North,
+                TileId.Haku => HonorTileView.Haku,
+                TileId.Hatsu => HonorTileView.Hatsu,
+                TileId.Chun => HonorTileView.Chun,
+                _ => throw new System.InvalidOperationException($"未対応の字牌IDです: {tile.Id}"),
+            };
+
+            return new TileView(TileSuitView.Jihai, 0, honor, false);
         }
         /// <summary>
         /// 手牌を文字列化する（門前牌・ツモ牌・副露をすべて含む）
