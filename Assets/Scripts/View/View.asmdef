@@ -1,0 +1,17 @@
+{
+    "name": "View",
+    "rootNamespace": "",
+    "references": [
+        "Presenter",
+        "R3.Unity",
+        "UnityEngine.UI"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": []
+}

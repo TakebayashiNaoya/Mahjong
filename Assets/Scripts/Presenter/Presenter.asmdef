@@ -1,0 +1,17 @@
+{
+    "name": "Presenter",
+    "rootNamespace": "",
+    "references": [
+        "Model",
+        "UniTask",
+        "R3.Unity"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": []
+}
