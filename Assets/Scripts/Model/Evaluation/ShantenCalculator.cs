@@ -44,7 +44,7 @@ namespace Mahjong.Model.Evaluation
             }
 
             var counts = BuildCounts(hand);
-            var shanten = CalculateStandard(counts, hand.Melds.Count);
+            var shanten = CalculateStandardFromCounts(counts, hand.Melds.Count);
 
             // 七対子・国士無双は門前限定
             if (hand.Melds.Count == 0)
@@ -82,11 +82,15 @@ namespace Mahjong.Model.Evaluation
         // プライベートメソッド
         // ========================================
         /// <summary>
-        /// 標準形のシャンテン数を計算する
+        /// 標準形のシャンテン数を、34種のカウント配列から直接計算する
         /// 対子を雀頭として使う解釈・搭子ブロックとして使う解釈の両方を数式評価時に比較し、
         /// 「頭を確保しそこねる」端数バグを構造的に避ける
+        /// Hand/Meld を実際に組み立てずに「鳴いたら／切ったらどうなるか」を試算したい
+        /// CPU層（牌効率シミュレーション）から再利用するため internal 公開している
         /// </summary>
-        private static int CalculateStandard(int[] counts, int existingMeldCount)
+        /// <param name="counts">34種のカウント配列</param>
+        /// <param name="existingMeldCount">既存の副露数</param>
+        internal static int CalculateStandardFromCounts(int[] counts, int existingMeldCount)
         {
             var shapes = HandDecomposer.EnumerateShapes(counts);
             var best = int.MaxValue;
