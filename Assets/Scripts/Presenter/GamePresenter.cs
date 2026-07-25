@@ -72,6 +72,12 @@ namespace Mahjong.Presenter
         /// 3D表示View層はこれを購読して牌モデルを並べる
         /// </summary>
         public ReactiveProperty<IReadOnlyList<TileView>> HumanHandTiles { get; } = new(System.Array.Empty<TileView>());
+        /// <summary>
+        /// 全プレイヤーの河（捨て牌）
+        /// 席順ではなく自分から見た相対位置で並ぶ（0=自分, 1=下家, 2=対面, 3=上家）
+        /// 3D表示View層はこれを購読して卓上に牌を並べる
+        /// </summary>
+        public ReactiveProperty<IReadOnlyList<IReadOnlyList<TileView>>> PlayerDiscards { get; } = new(System.Array.Empty<IReadOnlyList<TileView>>());
 
 
         // ========================================
@@ -322,16 +328,15 @@ namespace Mahjong.Presenter
 
                     sb.AppendLine($"{marker}P{i} {player.SeatWind} {player.Score}点{riichi}");
 
-                    // P0の手牌は3D表示に譲るため、テキストとしては出力しない
+                    // P0の手牌は2D表示、河は全員分3D表示に譲るため、テキストとしては出力しない
                     if (i != _humanPlayerIndex)
                     {
                         sb.AppendLine($"    手牌: {FormatHand(player.Hand)}");
                     }
-
-                    sb.AppendLine($"    河  : {string.Join(" ", player.Discards)}");
                 }
 
                 HumanHandTiles.Value = BuildHumanHandTiles();
+                PlayerDiscards.Value = BuildPlayerDiscards();
             }
 
             sb.AppendLine();
@@ -358,6 +363,24 @@ namespace Mahjong.Presenter
             }
 
             return tiles;
+        }
+        /// <summary>
+        /// 全プレイヤーの河を、自分から見た相対位置（0=自分, 1=下家, 2=対面, 3=上家）順に
+        /// TileViewのリストへ変換する
+        /// </summary>
+        private IReadOnlyList<IReadOnlyList<TileView>> BuildPlayerDiscards()
+        {
+            var playerCount = _game.Players.Count;
+            var result = new List<IReadOnlyList<TileView>>(playerCount);
+
+            for (var offset = 0; offset < playerCount; offset++)
+            {
+                var playerIndex = (_humanPlayerIndex + offset) % playerCount;
+                var discards = _game.Players[playerIndex].Discards.Select(TileView.FromModel).ToList();
+                result.Add(discards);
+            }
+
+            return result;
         }
         /// <summary>
         /// 手牌を文字列化する（門前牌・ツモ牌・副露をすべて含む）

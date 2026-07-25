@@ -14,10 +14,6 @@ namespace Mahjong.View
         // 定数
         // ========================================
         /// <summary>
-        /// 牌メッシュの読み込み元フォルダ（Resources基準の相対パス）
-        /// </summary>
-        private const string MESH_RESOURCE_ROOT = "Mahjong Complete Set/Mesh/";
-        /// <summary>
         /// 事前に焼き込んだアイコンの読み込み元フォルダ（Resources基準の相対パス）
         /// TileIconBaker（Editor専用）が書き出す先と一致させる
         /// </summary>
@@ -73,7 +69,7 @@ namespace Mahjong.View
         /// </summary>
         public static Sprite GetSprite(TileView tile)
         {
-            var key = ResolveMeshFileName(tile);
+            var key = TileMeshLibrary.ResolveFileName(tile);
 
             if (_cache.TryGetValue(key, out var cached))
             {
@@ -99,18 +95,17 @@ namespace Mahjong.View
         /// </summary>
         public static Texture2D RenderIconTexture(string meshFileName)
         {
-            var prefab = Resources.Load<GameObject>(MESH_RESOURCE_ROOT + meshFileName);
+            var prefab = TileMeshLibrary.LoadPrefab(meshFileName);
 
             if (prefab == null)
             {
-                Debug.LogError($"牌メッシュが見つかりません: {meshFileName}");
                 return null;
             }
 
             // FBXのデフォルト姿勢は寝かせて面を上に向けた状態のため、回転はかけない
             var tileInstance = Object.Instantiate(prefab, OffscreenPosition, Quaternion.identity);
             FlattenMaterials(tileInstance);
-            var bounds = MeasureBounds(tileInstance);
+            var bounds = TileMeshLibrary.MeasureBounds(tileInstance);
 
             var cameraObject = new GameObject("TileIconCamera");
             cameraObject.transform.position = new Vector3(bounds.center.x, bounds.max.y + CAMERA_HEIGHT_ABOVE_TILE, bounds.center.z);
@@ -174,66 +169,6 @@ namespace Mahjong.View
                     }
                 }
             }
-        }
-        /// <summary>
-        /// GameObject配下の全Rendererを合成したバウンディングボックスを計測する
-        /// </summary>
-        /// <exception cref="System.InvalidOperationException">Rendererが1つも無い場合</exception>
-        private static Bounds MeasureBounds(GameObject tileObject)
-        {
-            var renderers = tileObject.GetComponentsInChildren<Renderer>();
-
-            if (renderers.Length == 0)
-            {
-                throw new System.InvalidOperationException($"牌メッシュにRendererがありません: {tileObject.name}");
-            }
-
-            var bounds = renderers[0].bounds;
-
-            for (var i = 1; i < renderers.Length; i++)
-            {
-                bounds.Encapsulate(renderers[i].bounds);
-            }
-
-            return bounds;
-        }
-
-
-        // ========================================
-        // プライベートメソッド（牌メッシュの解決）
-        // ========================================
-        /// <summary>
-        /// TileView からリソースファイル名（拡張子なし）を組み立てる
-        /// 例: 萬子5(赤) → "pmanzu_5r", 東 → "pjihai_ton"
-        /// </summary>
-        /// <exception cref="System.InvalidOperationException">未対応のSuit/Honorの場合</exception>
-        private static string ResolveMeshFileName(TileView tile)
-        {
-            if (tile.Suit == TileSuitView.Jihai)
-            {
-                return tile.Honor switch
-                {
-                    HonorTileView.East => "pjihai_ton",
-                    HonorTileView.South => "pjihai_nan",
-                    HonorTileView.West => "pjihai_sha",
-                    HonorTileView.North => "pjihai_pe",
-                    HonorTileView.Haku => "pjihai_haku",
-                    HonorTileView.Hatsu => "pjihai_hatsu",
-                    HonorTileView.Chun => "pjihai_chun",
-                    _ => throw new System.InvalidOperationException($"字牌のHonorが不正です: {tile.Honor}"),
-                };
-            }
-
-            var suitPrefix = tile.Suit switch
-            {
-                TileSuitView.Manzu => "pmanzu",
-                TileSuitView.Pinzu => "ppinzu",
-                TileSuitView.Souzu => "psouzu",
-                _ => throw new System.InvalidOperationException($"未対応のTileSuitViewです: {tile.Suit}"),
-            };
-
-            var numberSuffix = tile.IsRed ? "5r" : tile.Number.ToString();
-            return $"{suitPrefix}_{numberSuffix}";
         }
     }
 }
