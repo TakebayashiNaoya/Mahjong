@@ -19,9 +19,11 @@ namespace Mahjong.View
         /// </summary>
         private const string BAKED_ICON_RESOURCE_ROOT = "TileIcons/";
         /// <summary>
-        /// 生成するアイコンの一辺のピクセル数
+        /// 生成するアイコンの高さのピクセル数
+        /// 牌は正方形ではないため、幅は牌の実測アスペクト比（幅÷奥行き）から都度算出する
+        /// （正方形に固定すると、短い方の軸に余白ができてしまうため）
         /// </summary>
-        private const int ICON_SIZE = 128;
+        private const int ICON_HEIGHT = 128;
         /// <summary>
         /// 撮影用に牌を一時的に配置する座標
         /// シーン上の他オブジェクトと絶対に重ならないよう、原点から大きく離す
@@ -32,9 +34,10 @@ namespace Mahjong.View
         /// </summary>
         private const float CAMERA_HEIGHT_ABOVE_TILE = 5f;
         /// <summary>
-        /// フレームに収める際の余白倍率（1.0だと牌の端がぎりぎりになる）
+        /// フレームに収める際の余白倍率
+        /// 手牌アイコンを隙間なく並べたいため、境界ぎりぎりの1.0にする
         /// </summary>
-        private const float FRAME_MARGIN = 1.1f;
+        private const float FRAME_MARGIN = 1.0f;
         /// <summary>
         /// 撮影カメラの姿勢（真下を向く）
         /// Z=180は、牌の絵柄が上下逆さまに映るのを補正するための調整値
@@ -82,7 +85,7 @@ namespace Mahjong.View
             {
                 var texture = RenderIconTexture(key);
                 sprite = texture != null
-                    ? Sprite.Create(texture, new Rect(0f, 0f, ICON_SIZE, ICON_SIZE), new Vector2(0.5f, 0.5f))
+                    ? Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), new Vector2(0.5f, 0.5f))
                     : null;
             }
 
@@ -111,22 +114,26 @@ namespace Mahjong.View
             cameraObject.transform.position = new Vector3(bounds.center.x, bounds.max.y + CAMERA_HEIGHT_ABOVE_TILE, bounds.center.z);
             cameraObject.transform.rotation = CameraRotation;
 
+            // CameraRotationにより、画面の縦方向はワールドZ、横方向はワールドXに対応する
+            // （牌は正方形ではないため、正方形のオルソサイズにすると短い方の軸に余白ができる）
+            var iconWidth = Mathf.Max(1, Mathf.RoundToInt(ICON_HEIGHT * (bounds.extents.x / bounds.extents.z)));
+
             var camera = cameraObject.AddComponent<Camera>();
             camera.orthographic = true;
-            camera.orthographicSize = Mathf.Max(bounds.extents.x, bounds.extents.z) * FRAME_MARGIN;
+            camera.orthographicSize = bounds.extents.z * FRAME_MARGIN;
             camera.clearFlags = CameraClearFlags.SolidColor;
             camera.backgroundColor = new Color(0f, 0f, 0f, 0f);
             camera.nearClipPlane = 0.01f;
             camera.farClipPlane = CAMERA_HEIGHT_ABOVE_TILE + bounds.size.y + 1f;
 
-            var renderTexture = new RenderTexture(ICON_SIZE, ICON_SIZE, 24, RenderTextureFormat.ARGB32);
+            var renderTexture = new RenderTexture(iconWidth, ICON_HEIGHT, 24, RenderTextureFormat.ARGB32);
             camera.targetTexture = renderTexture;
             camera.Render();
 
-            var texture = new Texture2D(ICON_SIZE, ICON_SIZE, TextureFormat.RGBA32, false);
+            var texture = new Texture2D(iconWidth, ICON_HEIGHT, TextureFormat.RGBA32, false);
             var previousActive = RenderTexture.active;
             RenderTexture.active = renderTexture;
-            texture.ReadPixels(new Rect(0f, 0f, ICON_SIZE, ICON_SIZE), 0, 0);
+            texture.ReadPixels(new Rect(0f, 0f, iconWidth, ICON_HEIGHT), 0, 0);
             texture.Apply();
             RenderTexture.active = previousActive;
 

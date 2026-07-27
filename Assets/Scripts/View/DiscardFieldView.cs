@@ -17,14 +17,6 @@ namespace Mahjong.View
         // 定数
         // ========================================
         /// <summary>
-        /// シーン上で卓として参照するGameObjectの名前
-        /// </summary>
-        private const string TABLE_OBJECT_NAME = "table";
-        /// <summary>
-        /// 河が見つからない場合に使うフォールバックの卓の大きさ（半径換算）
-        /// </summary>
-        private static readonly Vector3 FallbackTableExtents = new(3f, 0.1f, 3f);
-        /// <summary>
         /// 1行に並べる牌の枚数
         /// </summary>
         private const int TILES_PER_ROW = 6;
@@ -38,11 +30,11 @@ namespace Mahjong.View
         /// </summary>
         private const float ROW_MARGIN_FACTOR = TILE_MARGIN_FACTOR;
         /// <summary>
-        /// 卓の奥行きに対して、手前の縁からどれだけ内側に河の先頭行を置くか
-        /// 画面手前の手牌UIとの間に余白ができるよう、卓の中央寄りに置く
-        /// 0.5だと卓のちょうど中央になり、4人分の河が1点に重なってしまうため、それより十分小さい値にする
+        /// 卓の中心から、河の先頭行までの絶対距離
+        /// 卓のサイズに対する割合ではなく固定値にする理由: 割合にすると卓を小さくしたときに
+        /// 4人分の河が中心の1点に近づいて重なってしまう（牌自体の大きさは卓のサイズと無関係なため）
         /// </summary>
-        private const float NEAR_EDGE_INSET_FRACTION = 0.39f;
+        private const float NEAR_ROW_DISTANCE_FROM_CENTER = 1.2f;
         /// <summary>
         /// 卓の設置面のY座標
         /// 手牌3D表示のときの実測（立てた牌のピボットY=0.20、その半分の高さ0.20が底面までの距離）から
@@ -119,7 +111,7 @@ namespace Mahjong.View
                 _seatTileObjects.Add(new List<GameObject>());
             }
 
-            var tableBounds = ResolveTableBounds();
+            var tableBounds = TableLayout.ResolveBounds();
 
             for (var offset = 0; offset < playerDiscards.Count; offset++)
             {
@@ -156,7 +148,7 @@ namespace Mahjong.View
             // +180度は、牌のデフォルト姿勢を真上から見ると絵柄が上下逆になるための補正
             // （TileIconCacheのアイコン撮影カメラで必要だったZ=180の補正と同じ理由）
             var facingRotation = Quaternion.Euler(0f, 90f * offset + 180f, 0f);
-            var localNearZ = -tableBounds.extents.z + tableBounds.size.z * NEAR_EDGE_INSET_FRACTION;
+            var localNearZ = -NEAR_ROW_DISTANCE_FROM_CENTER;
 
             for (var index = existingTiles.Count; index < discards.Count; index++)
             {
@@ -221,21 +213,6 @@ namespace Mahjong.View
             tileObject.transform.rotation = facingRotation * jitterRotation;
 
             return tileObject;
-        }
-        /// <summary>
-        /// シーンの"table"オブジェクトの実測バウンディングボックスを返す
-        /// 見つからない場合はフォールバックの大きさを原点中心で返す
-        /// </summary>
-        private static Bounds ResolveTableBounds()
-        {
-            var tableObject = GameObject.Find(TABLE_OBJECT_NAME);
-
-            if (tableObject == null)
-            {
-                return new Bounds(Vector3.zero, FallbackTableExtents * 2f);
-            }
-
-            return TileMeshLibrary.MeasureBounds(tableObject);
         }
     }
 }

@@ -48,6 +48,25 @@ namespace Mahjong.View
         /// </summary>
         private const float HAND_PANEL_HEIGHT = 100f;
         /// <summary>
+        /// 手牌アイコンパネルの左端の位置（画面幅に対する割合）
+        /// 0だと画面左端にぴったり付くため、少し余白を空けて中央寄りにする
+        /// </summary>
+        private const float HAND_PANEL_LEFT_FRACTION = 0.05f;
+        /// <summary>
+        /// 手牌アイコンパネルの右端の位置（画面幅に対する割合）
+        /// 1.0未満にすることで、右側にポン・チー・カン等のUIを置く余白を確保する
+        /// </summary>
+        private const float HAND_PANEL_RIGHT_FRACTION = 0.68f;
+        /// <summary>
+        /// 手牌アイコン1枚の大きさ（正方形の一辺）
+        /// 元々のパネルの高さいっぱいに表示していたサイズ（HAND_PANEL_HEIGHT - 16）に戻す
+        /// </summary>
+        private const float HAND_ICON_SIZE = HAND_PANEL_HEIGHT - 16f;
+        /// <summary>
+        /// 手牌アイコン同士の隙間（アイコンの大きさに対する割合）
+        /// </summary>
+        private const float HAND_ICON_SPACING_FACTOR = 0.0f;
+        /// <summary>
         /// Canvasの基準解像度
         /// </summary>
         private static readonly Vector2 ReferenceResolution = new(1280f, 720f);
@@ -96,6 +115,7 @@ namespace Mahjong.View
             root.AddComponent<GamePresenter>();
             root.AddComponent<InGameView>();
             root.AddComponent<DiscardFieldView>();
+            root.AddComponent<OpponentHandFieldView>();
 
             EnsureEventSystemExists();
         }
@@ -131,6 +151,7 @@ namespace Mahjong.View
             _presenter.Human.PendingDiscardChoices.Subscribe(_ => RefreshHandRow()).AddTo(this);
             _presenter.Human.PendingCallChoices.Subscribe(OnCallChoicesPending).AddTo(this);
             _presenter.HumanHandTiles.Subscribe(_ => RefreshHandRow()).AddTo(this);
+            _presenter.HasDrawnTile.Subscribe(_ => RefreshHandRow()).AddTo(this);
         }
 
 
@@ -183,13 +204,17 @@ namespace Mahjong.View
         {
             ClearHandTiles();
 
+            var hasDrawnTile = _presenter.HasDrawnTile.Value;
             var pendingDiscardChoices = _presenter.Human.PendingDiscardChoices.Value;
+            var offsetX = 0f;
 
             if (pendingDiscardChoices != null)
             {
-                foreach (var choice in pendingDiscardChoices)
+                for (var i = 0; i < pendingDiscardChoices.Count; i++)
                 {
-                    CreateHandTileIcon(choice.TileView, () => _presenter.Human.SubmitDiscard(choice));
+                    var choice = pendingDiscardChoices[i];
+                    var isDrawnTile = hasDrawnTile && i == pendingDiscardChoices.Count - 1;
+                    offsetX = CreateHandTileIcon(choice.TileView, offsetX, isDrawnTile, () => _presenter.Human.SubmitDiscard(choice));
                 }
 
                 return;
@@ -202,28 +227,51 @@ namespace Mahjong.View
                 return;
             }
 
-            foreach (var tile in tiles)
+            for (var i = 0; i < tiles.Count; i++)
             {
-                CreateHandTileIcon(tile, null);
+                var isDrawnTile = hasDrawnTile && i == tiles.Count - 1;
+                offsetX = CreateHandTileIcon(tiles[i], offsetX, isDrawnTile, null);
             }
         }
         /// <summary>
-        /// 手牌アイコンを1つ作る
+        /// 手牌アイコンを1つ作り、次の牌を置くべきX座標を返す
+        /// HorizontalLayoutGroupに任せず座標を直接計算する理由: レイアウトグループは
+        /// パネルの幅を子に配分するため、鳴きなどで枚数が変わると牌同士の間隔まで変わってしまう。
+        /// 左端からの積み上げで置けば、枚数によらず間隔が一定になる
         /// </summary>
         /// <param name="tile">表示する牌</param>
+        /// <param name="offsetX">この牌を置く、パネル左端からのX座標</param>
+        /// <param name="isDrawnTile">ツモ牌かどうか。trueなら手前に牌1個分の隙間を空ける</param>
         /// <param name="onClick">クリック時の処理。nullの場合はクリック不可の表示のみになる</param>
-        private void CreateHandTileIcon(TileView tile, Action onClick)
+        /// <returns>次の牌を置くべきX座標</returns>
+        private float CreateHandTileIcon(TileView tile, float offsetX, bool isDrawnTile, Action onClick)
         {
-            var tileGameObject = new GameObject("HandTile", typeof(Image), typeof(LayoutElement));
+            var tileGameObject = new GameObject("HandTile", typeof(Image));
             tileGameObject.transform.SetParent(_handPanel, false);
 
             var image = tileGameObject.GetComponent<Image>();
-            image.sprite = TileIconCache.GetSprite(tile);
+            var sprite = TileIconCache.GetSprite(tile);
+            image.sprite = sprite;
             image.preserveAspect = true;
 
-            var layoutElement = tileGameObject.GetComponent<LayoutElement>();
-            layoutElement.minWidth = HAND_PANEL_HEIGHT - 16f;
-            layoutElement.minHeight = HAND_PANEL_HEIGHT - 16f;
+            // アイコン画像は牌の実際の縦横比（正方形ではない）のため、
+            // 表示枠も同じ縦横比にして余白ができないようにする
+            var aspect = sprite != null ? sprite.rect.width / sprite.rect.height : 1f;
+            var tileWidth = HAND_ICON_SIZE * aspect;
+            var spacing = tileWidth * HAND_ICON_SPACING_FACTOR;
+
+            if (isDrawnTile)
+            {
+                offsetX += tileWidth;
+            }
+
+            // パネルの左端中央を基準に、左から順に積み上げていく
+            var rect = image.rectTransform;
+            rect.anchorMin = new Vector2(0f, 0.5f);
+            rect.anchorMax = new Vector2(0f, 0.5f);
+            rect.pivot = new Vector2(0f, 0.5f);
+            rect.sizeDelta = new Vector2(tileWidth, HAND_ICON_SIZE);
+            rect.anchoredPosition = new Vector2(offsetX, 0f);
 
             if (onClick != null)
             {
@@ -232,15 +280,19 @@ namespace Mahjong.View
             }
 
             _activeHandTiles.Add(tileGameObject);
+            return offsetX + tileWidth + spacing;
         }
         /// <summary>
         /// 表示中の手牌アイコンをすべて破棄する
+        /// DestroyImmediateを使う理由: HumanHandTiles・HasDrawnTile・PendingDiscardChoicesの更新が
+        /// 同じRefresh()呼び出し内で連続するため、RefreshHandRowが同フレーム内に複数回呼ばれることがある。
+        /// Destroy（同フレーム内では消えない）だと古い牌と新しい牌が一時的に混在してレイアウトが崩れる
         /// </summary>
         private void ClearHandTiles()
         {
             foreach (var tileGameObject in _activeHandTiles)
             {
-                Destroy(tileGameObject);
+                DestroyImmediate(tileGameObject);
             }
 
             _activeHandTiles.Clear();
@@ -292,7 +344,7 @@ namespace Mahjong.View
             BuildHandPanel(canvasGameObject.transform);
         }
         /// <summary>
-        /// 画面下部に選択肢ボタンを並べるパネルを組み立てる
+        /// 手牌パネルのすぐ上に、選択肢ボタンを並べるパネルを組み立てる
         /// </summary>
         private void BuildButtonPanel(Transform canvasTransform)
         {
@@ -304,7 +356,7 @@ namespace Mahjong.View
             _buttonPanel.anchorMax = new Vector2(1f, 0f);
             _buttonPanel.pivot = new Vector2(0.5f, 0f);
             _buttonPanel.sizeDelta = new Vector2(0f, BUTTON_PANEL_HEIGHT);
-            _buttonPanel.anchoredPosition = new Vector2(0f, 8f);
+            _buttonPanel.anchoredPosition = new Vector2(0f, HAND_PANEL_HEIGHT + 16f);
 
             var layout = panelGameObject.GetComponent<HorizontalLayoutGroup>();
             layout.spacing = 8f;
@@ -314,26 +366,23 @@ namespace Mahjong.View
             layout.childAlignment = TextAnchor.MiddleCenter;
         }
         /// <summary>
-        /// ボタンパネルのすぐ上に、手牌アイコンを並べるパネルを組み立てる
+        /// 画面最下部に、手牌アイコンを並べるパネルを組み立てる
+        /// じゃん魂のように打牌は手牌アイコン自体のタップで行うため、他の選択肢ボタン（リーチ確認・鳴き選択）より
+        /// 下・画面端に近い位置に置く
         /// </summary>
         private void BuildHandPanel(Transform canvasTransform)
         {
-            var panelGameObject = new GameObject("HandPanel", typeof(RectTransform), typeof(HorizontalLayoutGroup));
+            // 牌の座標は CreateHandTileIcon が左端から直接計算するため、HorizontalLayoutGroupは付けない
+            // （レイアウトグループに任せると、枚数が変わったときに牌同士の間隔まで変わってしまう）
+            var panelGameObject = new GameObject("HandPanel", typeof(RectTransform));
             panelGameObject.transform.SetParent(canvasTransform, false);
 
             _handPanel = panelGameObject.GetComponent<RectTransform>();
-            _handPanel.anchorMin = new Vector2(0f, 0f);
-            _handPanel.anchorMax = new Vector2(1f, 0f);
+            _handPanel.anchorMin = new Vector2(HAND_PANEL_LEFT_FRACTION, 0f);
+            _handPanel.anchorMax = new Vector2(HAND_PANEL_RIGHT_FRACTION, 0f);
             _handPanel.pivot = new Vector2(0.5f, 0f);
             _handPanel.sizeDelta = new Vector2(0f, HAND_PANEL_HEIGHT);
-            _handPanel.anchoredPosition = new Vector2(0f, BUTTON_PANEL_HEIGHT + 16f);
-
-            var layout = panelGameObject.GetComponent<HorizontalLayoutGroup>();
-            layout.spacing = 4f;
-            layout.padding = new RectOffset(8, 8, 8, 8);
-            layout.childForceExpandWidth = false;
-            layout.childForceExpandHeight = false;
-            layout.childAlignment = TextAnchor.MiddleCenter;
+            _handPanel.anchoredPosition = new Vector2(0f, 8f);
         }
         /// <summary>
         /// 選択肢ボタンを1つ作る
@@ -367,12 +416,14 @@ namespace Mahjong.View
         }
         /// <summary>
         /// 表示中のボタンをすべて破棄する
+        /// DestroyImmediateを使う理由: 複数のReactiveProperty更新が同フレーム内で連続することがあり、
+        /// Destroy（同フレーム内では消えない）だと古いボタンと新しいボタンが一時的に混在してしまうため
         /// </summary>
         private void ClearButtons()
         {
             foreach (var button in _activeButtons)
             {
-                Destroy(button);
+                DestroyImmediate(button);
             }
 
             _activeButtons.Clear();

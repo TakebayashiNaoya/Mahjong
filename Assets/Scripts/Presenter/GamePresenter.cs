@@ -73,11 +73,23 @@ namespace Mahjong.Presenter
         /// </summary>
         public ReactiveProperty<IReadOnlyList<TileView>> HumanHandTiles { get; } = new(System.Array.Empty<TileView>());
         /// <summary>
+        /// 人間プレイヤーがツモ牌を持っているかどうか
+        /// trueの場合、HumanHandTiles・PendingDiscardChoicesの末尾がツモ牌であることを表す
+        /// （鳴いた直後の打牌選択にはツモ牌が無いため、常に末尾がツモ牌とは限らない）
+        /// </summary>
+        public ReactiveProperty<bool> HasDrawnTile { get; } = new(false);
+        /// <summary>
         /// 全プレイヤーの河（捨て牌）
         /// 席順ではなく自分から見た相対位置で並ぶ（0=自分, 1=下家, 2=対面, 3=上家）
         /// 3D表示View層はこれを購読して卓上に牌を並べる
         /// </summary>
         public ReactiveProperty<IReadOnlyList<IReadOnlyList<TileView>>> PlayerDiscards { get; } = new(System.Array.Empty<IReadOnlyList<TileView>>());
+        /// <summary>
+        /// 全プレイヤーの伏せ手牌の枚数（門前牌＋ツモ牌。副露した牌は含まない）
+        /// 並びは PlayerDiscards と同じく自分から見た相対位置（0=自分, 1=下家, 2=対面, 3=上家）
+        /// 他家の手牌は中身を公開しないため、枚数だけを渡して伏せ牌として表示させる
+        /// </summary>
+        public ReactiveProperty<IReadOnlyList<int>> ConcealedTileCounts { get; } = new(System.Array.Empty<int>());
 
 
         // ========================================
@@ -328,15 +340,20 @@ namespace Mahjong.Presenter
 
                     sb.AppendLine($"{marker}P{i} {player.SeatWind} {player.Score}点{riichi}");
 
-                    // P0の手牌は2D表示、河は全員分3D表示に譲るため、テキストとしては出力しない
-                    if (i != _humanPlayerIndex)
+                    // 手牌（自分は2D、他家は伏せ牌）と河は3D表示に譲るため、テキストとしては出力しない
+                    // 副露は麻雀では公開情報であり、まだ3D表示していないためテキストに残す
+                    var melds = FormatMelds(player.Hand);
+
+                    if (melds.Length > 0)
                     {
-                        sb.AppendLine($"    手牌: {FormatHand(player.Hand)}");
+                        sb.AppendLine($"    副露: {melds}");
                     }
                 }
 
                 HumanHandTiles.Value = BuildHumanHandTiles();
+                HasDrawnTile.Value = _game.Players[_humanPlayerIndex].Hand.DrawnTile != null;
                 PlayerDiscards.Value = BuildPlayerDiscards();
+                ConcealedTileCounts.Value = BuildConcealedTileCounts();
             }
 
             sb.AppendLine();
@@ -383,24 +400,28 @@ namespace Mahjong.Presenter
             return result;
         }
         /// <summary>
-        /// 手牌を文字列化する（門前牌・ツモ牌・副露をすべて含む）
+        /// 全プレイヤーの伏せ手牌の枚数を、自分から見た相対位置（0=自分, 1=下家, 2=対面, 3=上家）順に
+        /// 組み立てる
         /// </summary>
-        private static string FormatHand(Hand hand)
+        private IReadOnlyList<int> BuildConcealedTileCounts()
         {
-            var sb = new StringBuilder();
-            sb.Append(string.Join(" ", hand.Tiles.Select(t => t.ToString())));
+            var playerCount = _game.Players.Count;
+            var result = new List<int>(playerCount);
 
-            if (hand.DrawnTile != null)
+            for (var offset = 0; offset < playerCount; offset++)
             {
-                sb.Append($"  ツモ:{hand.DrawnTile}");
+                var playerIndex = (_humanPlayerIndex + offset) % playerCount;
+                result.Add(_game.Players[playerIndex].Hand.TileCount);
             }
 
-            foreach (var meld in hand.Melds)
-            {
-                sb.Append($"  {meld}");
-            }
-
-            return sb.ToString();
+            return result;
+        }
+        /// <summary>
+        /// 副露のみを文字列化する（門前牌・ツモ牌は含まない。無ければ空文字列）
+        /// </summary>
+        private static string FormatMelds(Hand hand)
+        {
+            return string.Join("  ", hand.Melds.Select(meld => meld.ToString()));
         }
     }
 }
