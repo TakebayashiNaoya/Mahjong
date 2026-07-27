@@ -17,14 +17,6 @@ namespace Mahjong.View
         // 定数
         // ========================================
         /// <summary>
-        /// シーン上で卓として参照するGameObjectの名前
-        /// </summary>
-        private const string TABLE_OBJECT_NAME = "table";
-        /// <summary>
-        /// 河が見つからない場合に使うフォールバックの卓の大きさ（半径換算）
-        /// </summary>
-        private static readonly Vector3 FallbackTableExtents = new(3f, 0.1f, 3f);
-        /// <summary>
         /// 1行に並べる牌の枚数
         /// </summary>
         private const int TILES_PER_ROW = 6;
@@ -37,19 +29,6 @@ namespace Mahjong.View
         /// 牌同士の左右の隙間（TILE_MARGIN_FACTOR）と揃える
         /// </summary>
         private const float ROW_MARGIN_FACTOR = TILE_MARGIN_FACTOR;
-        /// <summary>
-        /// 卓の奥行きに対して、手前の縁からどれだけ内側に河の先頭行を置くか
-        /// 画面手前の手牌UIとの間に余白ができるよう、卓の中央寄りに置く
-        /// 0.5だと卓のちょうど中央になり、4人分の河が1点に重なってしまうため、それより十分小さい値にする
-        /// </summary>
-        private const float NEAR_EDGE_INSET_FRACTION = 0.39f;
-        /// <summary>
-        /// 卓の設置面のY座標
-        /// 手牌3D表示のときの実測（立てた牌のピボットY=0.20、その半分の高さ0.20が底面までの距離）から
-        /// 逆算した推定値。河の牌は寝かせて置くため、ピボットからの底面までの距離は
-        /// 牌ごとに実測したバウンディングボックス（localBounds.min.y）から別途補正する
-        /// </summary>
-        private const float TABLE_SURFACE_Y = 0.0f;
         /// <summary>
         /// 牌の位置に加えるランダムなずれの最大幅（機械的に整列しすぎないようにする）
         /// </summary>
@@ -119,11 +98,11 @@ namespace Mahjong.View
                 _seatTileObjects.Add(new List<GameObject>());
             }
 
-            var tableBounds = ResolveTableBounds();
+            var tableCenter = TableLayout.ResolveCenter();
 
             for (var offset = 0; offset < playerDiscards.Count; offset++)
             {
-                UpdateSeatDiscards(playerDiscards[offset], offset, tableBounds);
+                UpdateSeatDiscards(playerDiscards[offset], offset, tableCenter);
             }
         }
         /// <summary>
@@ -131,7 +110,7 @@ namespace Mahjong.View
         /// 既に配置済みの牌はそのままにし、末尾に増えた牌だけを新しく配置する
         /// 局が変わって河が短くなった（リセットされた）場合のみ、すべて作り直す
         /// </summary>
-        private void UpdateSeatDiscards(IReadOnlyList<TileView> discards, int offset, Bounds tableBounds)
+        private void UpdateSeatDiscards(IReadOnlyList<TileView> discards, int offset, Vector3 tableCenter)
         {
             var existingTiles = _seatTileObjects[offset];
 
@@ -152,15 +131,15 @@ namespace Mahjong.View
 
             // 配置位置を回転させるための角度と、牌自体の向きを回転させるための角度は別物のため分ける
             // （どちらも90度×offsetで席の位置に合わせるが、牌の向きにだけ+180度の補正が要る）
-            var positionRotation = Quaternion.Euler(0f, 90f * offset, 0f);
+            var positionRotation = Quaternion.Euler(0.0f, 90.0f * offset, 0.0f);
             // +180度は、牌のデフォルト姿勢を真上から見ると絵柄が上下逆になるための補正
             // （TileIconCacheのアイコン撮影カメラで必要だったZ=180の補正と同じ理由）
-            var facingRotation = Quaternion.Euler(0f, 90f * offset + 180f, 0f);
-            var localNearZ = -tableBounds.extents.z + tableBounds.size.z * NEAR_EDGE_INSET_FRACTION;
+            var facingRotation = Quaternion.Euler(0.0f, 90.0f * offset + 180.0f, 0.0f);
+            var localNearZ = -TableLayout.DISCARD_ROW_DISTANCE_FROM_CENTER;
 
             for (var index = existingTiles.Count; index < discards.Count; index++)
             {
-                var tileObject = PlaceDiscardTile(discards[index], index, positionRotation, facingRotation, localNearZ, tableBounds);
+                var tileObject = PlaceDiscardTile(discards[index], index, positionRotation, facingRotation, localNearZ, tableCenter);
 
                 if (tileObject != null)
                 {
@@ -173,7 +152,7 @@ namespace Mahjong.View
         /// 「自分（offset=0）が手前で正面を向いている」座標系で位置を組み立てた後、
         /// 卓の中心を軸に90度×offset回転させて、その席の位置・向きに変換する
         /// </summary>
-        private GameObject PlaceDiscardTile(TileView tile, int index, Quaternion positionRotation, Quaternion facingRotation, float localNearZ, Bounds tableBounds)
+        private GameObject PlaceDiscardTile(TileView tile, int index, Quaternion positionRotation, Quaternion facingRotation, float localNearZ, Vector3 tableCenter)
         {
             var prefab = TileMeshLibrary.LoadPrefab(tile);
 
@@ -192,8 +171,8 @@ namespace Mahjong.View
             _referenceTileBounds ??= localBounds;
             var reference = _referenceTileBounds.Value;
 
-            var tileWidth = reference.size.x * (1f + TILE_MARGIN_FACTOR);
-            var rowDepth = reference.size.z * (1f + ROW_MARGIN_FACTOR);
+            var tileWidth = reference.size.x * (1.0f + TILE_MARGIN_FACTOR);
+            var rowDepth = reference.size.z * (1.0f + ROW_MARGIN_FACTOR);
             var rowStartX = -tileWidth * TILES_PER_ROW * 0.5f;
 
             var row = index / TILES_PER_ROW;
@@ -205,37 +184,22 @@ namespace Mahjong.View
             // （このメソッドは新規に増えた牌にしか呼ばれないため、既に配置済みの牌のずれは変わらない）
             var jitterX = Random.Range(-POSITION_JITTER_RANGE, POSITION_JITTER_RANGE);
             var jitterZ = Random.Range(-POSITION_JITTER_RANGE, POSITION_JITTER_RANGE);
-            var localPosition = new Vector3(localX + jitterX, 0f, localZ + jitterZ);
+            var localPosition = new Vector3(localX + jitterX, 0.0f, localZ + jitterZ);
             var rotatedOffset = positionRotation * localPosition;
 
             // 牌の底面が卓の設置面に揃うよう、実測バウンディングボックスからYを補正する
             // （ピボットが牌の中心にあるため、そのままだと底面が沈んだり浮いたりする）
-            var restY = TABLE_SURFACE_Y - localBounds.min.y;
+            var restY = TableLayout.SURFACE_Y - localBounds.min.y;
             var worldPosition = new Vector3(
-                tableBounds.center.x + rotatedOffset.x,
+                tableCenter.x + rotatedOffset.x,
                 restY,
-                tableBounds.center.z + rotatedOffset.z);
-            var jitterRotation = Quaternion.Euler(0f, Random.Range(-ROTATION_JITTER_DEGREES, ROTATION_JITTER_DEGREES), 0f);
+                tableCenter.z + rotatedOffset.z);
+            var jitterRotation = Quaternion.Euler(0.0f, Random.Range(-ROTATION_JITTER_DEGREES, ROTATION_JITTER_DEGREES), 0.0f);
 
             tileObject.transform.position = worldPosition;
             tileObject.transform.rotation = facingRotation * jitterRotation;
 
             return tileObject;
-        }
-        /// <summary>
-        /// シーンの"table"オブジェクトの実測バウンディングボックスを返す
-        /// 見つからない場合はフォールバックの大きさを原点中心で返す
-        /// </summary>
-        private static Bounds ResolveTableBounds()
-        {
-            var tableObject = GameObject.Find(TABLE_OBJECT_NAME);
-
-            if (tableObject == null)
-            {
-                return new Bounds(Vector3.zero, FallbackTableExtents * 2f);
-            }
-
-            return TileMeshLibrary.MeasureBounds(tableObject);
         }
     }
 }
