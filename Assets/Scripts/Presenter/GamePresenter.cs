@@ -68,16 +68,10 @@ namespace Mahjong.Presenter
         /// </summary>
         public HumanPlayerController Human { get; } = new();
         /// <summary>
-        /// 人間プレイヤー自身の手牌（門前牌 + ツモ牌、この順）
-        /// 3D表示View層はこれを購読して牌モデルを並べる
+        /// 人間プレイヤー自身の手牌（牌の並びとツモ牌の位置）
+        /// View層はこれを購読してアイコンを並べる
         /// </summary>
-        public ReactiveProperty<IReadOnlyList<TileView>> HumanHandTiles { get; } = new(System.Array.Empty<TileView>());
-        /// <summary>
-        /// 人間プレイヤーがツモ牌を持っているかどうか
-        /// trueの場合、HumanHandTiles・PendingDiscardChoicesの末尾がツモ牌であることを表す
-        /// （鳴いた直後の打牌選択にはツモ牌が無いため、常に末尾がツモ牌とは限らない）
-        /// </summary>
-        public ReactiveProperty<bool> HasDrawnTile { get; } = new(false);
+        public ReactiveProperty<HumanHandView> HumanHand { get; } = new(HumanHandView.Empty);
         /// <summary>
         /// 全プレイヤーの河（捨て牌）
         /// 席順ではなく自分から見た相対位置で並ぶ（0=自分, 1=下家, 2=対面, 3=上家）
@@ -85,11 +79,11 @@ namespace Mahjong.Presenter
         /// </summary>
         public ReactiveProperty<IReadOnlyList<IReadOnlyList<TileView>>> PlayerDiscards { get; } = new(System.Array.Empty<IReadOnlyList<TileView>>());
         /// <summary>
-        /// 全プレイヤーの伏せ手牌の枚数（門前牌＋ツモ牌。副露した牌は含まない）
+        /// 全プレイヤーの伏せ手牌（副露した牌は含まない）
         /// 並びは PlayerDiscards と同じく自分から見た相対位置（0=自分, 1=下家, 2=対面, 3=上家）
-        /// 他家の手牌は中身を公開しないため、枚数だけを渡して伏せ牌として表示させる
+        /// 他家の手牌は中身を公開しないため、枚数とツモ牌の有無だけを渡して伏せ牌として表示させる
         /// </summary>
-        public ReactiveProperty<IReadOnlyList<int>> ConcealedTileCounts { get; } = new(System.Array.Empty<int>());
+        public ReactiveProperty<IReadOnlyList<ConcealedHandView>> ConcealedHands { get; } = new(System.Array.Empty<ConcealedHandView>());
 
 
         // ========================================
@@ -350,10 +344,9 @@ namespace Mahjong.Presenter
                     }
                 }
 
-                HumanHandTiles.Value = BuildHumanHandTiles();
-                HasDrawnTile.Value = _game.Players[_humanPlayerIndex].Hand.DrawnTile != null;
+                HumanHand.Value = BuildHumanHand();
                 PlayerDiscards.Value = BuildPlayerDiscards();
-                ConcealedTileCounts.Value = BuildConcealedTileCounts();
+                ConcealedHands.Value = BuildConcealedHands();
             }
 
             sb.AppendLine();
@@ -367,19 +360,20 @@ namespace Mahjong.Presenter
             DisplayText.Value = sb.ToString();
         }
         /// <summary>
-        /// 人間プレイヤーの手牌（門前牌 + ツモ牌）をTileViewのリストに変換する
+        /// 人間プレイヤーの手牌（門前牌 + ツモ牌）を、ツモ牌の位置とあわせて1つのスナップショットに変換する
         /// </summary>
-        private IReadOnlyList<TileView> BuildHumanHandTiles()
+        private HumanHandView BuildHumanHand()
         {
             var hand = _game.Players[_humanPlayerIndex].Hand;
             var tiles = hand.Tiles.Select(TileView.FromModel).ToList();
 
-            if (hand.DrawnTile != null)
+            if (hand.DrawnTile == null)
             {
-                tiles.Add(TileView.FromModel(hand.DrawnTile));
+                return new HumanHandView(tiles, HumanHandView.NO_DRAWN_TILE_INDEX);
             }
 
-            return tiles;
+            tiles.Add(TileView.FromModel(hand.DrawnTile));
+            return new HumanHandView(tiles, tiles.Count - 1);
         }
         /// <summary>
         /// 全プレイヤーの河を、自分から見た相対位置（0=自分, 1=下家, 2=対面, 3=上家）順に
@@ -400,18 +394,19 @@ namespace Mahjong.Presenter
             return result;
         }
         /// <summary>
-        /// 全プレイヤーの伏せ手牌の枚数を、自分から見た相対位置（0=自分, 1=下家, 2=対面, 3=上家）順に
+        /// 全プレイヤーの伏せ手牌を、自分から見た相対位置（0=自分, 1=下家, 2=対面, 3=上家）順に
         /// 組み立てる
         /// </summary>
-        private IReadOnlyList<int> BuildConcealedTileCounts()
+        private IReadOnlyList<ConcealedHandView> BuildConcealedHands()
         {
             var playerCount = _game.Players.Count;
-            var result = new List<int>(playerCount);
+            var result = new List<ConcealedHandView>(playerCount);
 
             for (var offset = 0; offset < playerCount; offset++)
             {
                 var playerIndex = (_humanPlayerIndex + offset) % playerCount;
-                result.Add(_game.Players[playerIndex].Hand.TileCount);
+                var hand = _game.Players[playerIndex].Hand;
+                result.Add(new ConcealedHandView(hand.Tiles.Count, hand.DrawnTile != null));
             }
 
             return result;

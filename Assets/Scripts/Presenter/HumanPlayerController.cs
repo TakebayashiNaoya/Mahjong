@@ -70,8 +70,14 @@ namespace Mahjong.Presenter
                 ? CpuDiscardSelector.FindTenpaiKeepingDiscards(player.Hand)
                 : player.Hand.GetClosedTiles();
 
+            // ツモ牌かどうかは候補の位置ではなく牌そのもので判定する
+            // （リーチ宣言直後は候補が絞り込まれるため、末尾がツモ牌とは限らず、候補から外れることもある）
+            var drawnTile = player.Hand.DrawnTile;
+
             _discardSource = new UniTaskCompletionSource<Tile>();
-            PendingDiscardChoices.Value = candidateTiles.Select(t => new DiscardChoice(t)).ToList();
+            PendingDiscardChoices.Value = candidateTiles
+                .Select(t => new DiscardChoice(t, ReferenceEquals(t, drawnTile)))
+                .ToList();
 
             var result = await _discardSource.Task;
             PendingDiscardChoices.Value = null;
