@@ -49,9 +49,10 @@ namespace Mahjong.View
         private const float HAND_PANEL_HEIGHT = 100.0f;
         /// <summary>
         /// 手牌アイコンパネルの左端の位置（画面幅に対する割合）
-        /// 0だと画面左端にぴったり付くため、少し余白を空けて中央寄りにする
+        /// 手牌はこのパネルの左端から右へ並べるため、この値が手牌全体の左右位置になる
+        /// 0だと画面左端にぴったり付くため、アイコン2枚分ほど余白を空けて中央寄りにする
         /// </summary>
-        private const float HAND_PANEL_LEFT_FRACTION = 0.05f;
+        private const float HAND_PANEL_LEFT_FRACTION = 0.1f;
         /// <summary>
         /// 手牌アイコン1枚の高さ
         /// 枚数によって大きさが変わらないよう、パネル幅には合わせず常にこの大きさで表示する
@@ -118,8 +119,7 @@ namespace Mahjong.View
             var root = new GameObject("MahjongGameRoot");
             root.AddComponent<GamePresenter>();
             root.AddComponent<InGameView>();
-            root.AddComponent<DiscardFieldView>();
-            root.AddComponent<OpponentHandFieldView>();
+            root.AddComponent<TableFieldView>();
 
             EnsureEventSystemExists();
         }
