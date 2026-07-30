@@ -24,10 +24,11 @@ namespace Mahjong.Presenter
         // ========================================
         /// <summary>
         /// 副露を構成する牌（左から並べる順）
+        /// 鳴いた牌は RotatedTileIndex の位置に置かれ、残りの牌は牌の順に並ぶ
         /// </summary>
         public IReadOnlyList<TileView> Tiles { get; }
         /// <summary>
-        /// 横向きに置く牌のインデックス
+        /// 横向きに置く牌（＝鳴いた牌）のインデックス
         /// 上家から鳴いた場合は左端、対面なら左から2枚目、下家なら右端になる
         /// 暗槓の場合は NO_ROTATED_TILE_INDEX
         /// </summary>

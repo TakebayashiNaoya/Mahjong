@@ -7,6 +7,7 @@ using Mahjong.Model.Common;
 using Mahjong.Model.Cpu;
 using Mahjong.Model.Game;
 using Mahjong.Model.Hands;
+using Mahjong.Model.Tiles;
 using R3;
 using UnityEngine;
 
@@ -440,8 +441,35 @@ namespace Mahjong.Presenter
         /// </summary>
         private static MeldView BuildMeldView(Meld meld, Wind seatWind, int playerCount)
         {
-            var tiles = meld.Tiles.Select(TileView.FromModel).ToList();
-            return new MeldView(tiles, ResolveRotatedTileIndex(meld, seatWind, playerCount));
+            var rotatedTileIndex = ResolveRotatedTileIndex(meld, seatWind, playerCount);
+            return new MeldView(BuildMeldTiles(meld, rotatedTileIndex), rotatedTileIndex);
+        }
+        /// <summary>
+        /// 副露の牌を、卓上に並べる順に組み立てる
+        /// 鳴いた牌を横向きに置く位置へ移し、残りの牌は牌の順に並べる
+        /// Model層は「手牌から出した牌 + 鳴いた牌」の順で保持しているため、そのまま並べると
+        /// 順子が数字順にならず、横向きになる牌も鳴いた牌とは限らなくなるため
+        /// </summary>
+        /// <param name="meld">変換する副露</param>
+        /// <param name="rotatedTileIndex">横向きに置く牌のインデックス</param>
+        private static IReadOnlyList<TileView> BuildMeldTiles(Meld meld, int rotatedTileIndex)
+        {
+            var tiles = new List<Tile>(meld.Tiles);
+
+            // 暗槓は横向きにする牌が無いため、並べ替えずにそのまま渡す
+            if (rotatedTileIndex == MeldView.NO_ROTATED_TILE_INDEX || !tiles.Remove(meld.StolenTile))
+            {
+                return meld.Tiles.Select(TileView.FromModel).ToList();
+            }
+
+            var sorted = tiles
+                .OrderBy(tile => tile.Suit)
+                .ThenBy(tile => tile.Suit == TileSuit.Jihai ? (int)tile.Id : tile.Number)
+                .ThenBy(tile => tile.IsRed ? 1 : 0)
+                .ToList();
+
+            sorted.Insert(rotatedTileIndex, meld.StolenTile);
+            return sorted.Select(TileView.FromModel).ToList();
         }
         /// <summary>
         /// 鳴いた相手から、横向きに置く牌のインデックスを求める
