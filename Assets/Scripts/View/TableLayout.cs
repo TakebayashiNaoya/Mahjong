@@ -43,6 +43,12 @@ namespace Mahjong.View
         /// </summary>
         public const float MELD_ROW_RIGHT_EDGE_IN_TILES = 11.0f;
         /// <summary>
+        /// 卓上に寝かせて置く牌の、席ローカルでの向き
+        /// 180度は、牌のデフォルト姿勢を真上から見ると絵柄が上下逆になるための補正
+        /// （TileIconCacheのアイコン撮影カメラで必要だったZ=180の補正と同じ理由）
+        /// </summary>
+        public static readonly Quaternion FlatTileRotation = Quaternion.Euler(0.0f, 180.0f, 0.0f);
+        /// <summary>
         /// シーン上で卓として参照するGameObjectの名前
         /// </summary>
         private const string TABLE_OBJECT_NAME = "table";
@@ -91,28 +97,6 @@ namespace Mahjong.View
         public static Quaternion GetSeatRotation(int offset)
         {
             return Quaternion.Euler(0.0f, -90.0f * offset, 0.0f);
-        }
-        /// <summary>
-        /// 卓上に寝かせて置く牌が、その席から見て正しい絵柄の向きになる回転を返す
-        /// 180度は、牌のデフォルト姿勢を真上から見ると絵柄が上下逆になるための補正
-        /// （TileIconCacheのアイコン撮影カメラで必要だったZ=180の補正と同じ理由）
-        /// </summary>
-        /// <param name="offset">自分から見た相対位置（0=自分, 1=下家, 2=対面, 3=上家）</param>
-        public static Quaternion GetFlatTileRotation(int offset)
-        {
-            return GetSeatRotation(offset) * Quaternion.Euler(0.0f, 180.0f, 0.0f);
-        }
-        /// <summary>
-        /// 席の座標系（自分=offset 0 が手前で正面を向く）で組み立てた位置を、卓上のワールド座標に変換する
-        /// X・Zは卓の中心を軸に回転させ、Yはそのまま通す（牌ごとの底面補正は呼び出し側で行う）
-        /// </summary>
-        /// <param name="seatLocalPosition">席の座標系での位置</param>
-        /// <param name="offset">自分から見た相対位置（0=自分, 1=下家, 2=対面, 3=上家）</param>
-        public static Vector3 ToWorldPosition(Vector3 seatLocalPosition, int offset)
-        {
-            var center = ResolveCenter();
-            var rotated = GetSeatRotation(offset) * new Vector3(seatLocalPosition.x, 0.0f, seatLocalPosition.z);
-            return new Vector3(center.x + rotated.x, seatLocalPosition.y, center.z + rotated.z);
         }
     }
 }
