@@ -21,20 +21,23 @@ namespace Mahjong.View
         /// <summary>
         /// 牌同士の隙間（牌の幅に対する割合）
         /// </summary>
-        private const float TILE_MARGIN_FACTOR = 0.1f;
+        private const float TILE_MARGIN_FACTOR = 0.05f;
         /// <summary>
         /// 行同士の隙間（牌の奥行きに対する割合）
         /// 牌同士の左右の隙間（TILE_MARGIN_FACTOR）と揃える
         /// </summary>
         private const float ROW_MARGIN_FACTOR = TILE_MARGIN_FACTOR;
         /// <summary>
-        /// 牌の位置に加えるランダムなずれの最大幅（機械的に整列しすぎないようにする）
+        /// 牌の位置に加えるランダムなずれの最大幅（牌同士の隙間に対する割合）
+        /// 機械的に整列しすぎないようにするためのもの
+        /// 絶対値ではなく隙間に対する割合にしているのは、隙間を詰めたときにずれだけが残って
+        /// 隣の牌と重なるのを防ぐため（半分までに抑えれば、隣り合う牌がずれても接するに留まる）
         /// </summary>
-        private const float POSITION_JITTER_RANGE = 0.015f;
+        private const float POSITION_JITTER_FACTOR = 0.5f;
         /// <summary>
         /// 牌の向きに加えるランダムな回転の最大幅（度）
         /// </summary>
-        private const float ROTATION_JITTER_DEGREES = 3.0f;
+        private const float ROTATION_JITTER_DEGREES = 1.5f;
 
 
         // ========================================
@@ -127,8 +130,9 @@ namespace Mahjong.View
 
             // 機械的に整列しすぎないよう、位置・向きに小さなランダムなずれを加える
             // （このメソッドは新規に増えた牌にしか呼ばれないため、既に配置済みの牌のずれは変わらない）
-            var jitterX = Random.Range(-POSITION_JITTER_RANGE, POSITION_JITTER_RANGE);
-            var jitterZ = Random.Range(-POSITION_JITTER_RANGE, POSITION_JITTER_RANGE);
+            var jitterRange = reference.size.x * TILE_MARGIN_FACTOR * POSITION_JITTER_FACTOR;
+            var jitterX = Random.Range(-jitterRange, jitterRange);
+            var jitterZ = Random.Range(-jitterRange, jitterRange);
             var jitterRotation = Quaternion.Euler(0.0f, Random.Range(-ROTATION_JITTER_DEGREES, ROTATION_JITTER_DEGREES), 0.0f);
 
             // 牌の底面が卓の設置面に揃うようYを補正する

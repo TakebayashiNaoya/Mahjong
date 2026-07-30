@@ -21,8 +21,10 @@ namespace Mahjong.View
         private const string CONCEALED_TILE_MESH_NAME = "pai";
         /// <summary>
         /// 牌同士の隙間（牌の幅に対する割合）
+        /// 実物の手牌は牌同士が接しているため隙間を空けない
+        /// （牌のメッシュには面取りがあるので、隙間0でも境目は見える）
         /// </summary>
-        private const float TILE_MARGIN_FACTOR = 0.1f;
+        private const float TILE_MARGIN_FACTOR = 0.0f;
         /// <summary>
         /// 門前牌の右端からツモ牌までに空ける隙間（牌の幅に対する割合）
         /// 自分の手牌アイコン（InGameView）と同じく、牌1枚分空けてツモ牌と分かるようにする
