@@ -98,11 +98,9 @@ namespace Mahjong.View
                 _seatTileObjects.Add(new List<GameObject>());
             }
 
-            var tableCenter = TableLayout.ResolveCenter();
-
             for (var offset = 0; offset < playerDiscards.Count; offset++)
             {
-                UpdateSeatDiscards(playerDiscards[offset], offset, tableCenter);
+                UpdateSeatDiscards(playerDiscards[offset], offset);
             }
         }
         /// <summary>
@@ -110,7 +108,7 @@ namespace Mahjong.View
         /// 既に配置済みの牌はそのままにし、末尾に増えた牌だけを新しく配置する
         /// 局が変わって河が短くなった（リセットされた）場合のみ、すべて作り直す
         /// </summary>
-        private void UpdateSeatDiscards(IReadOnlyList<TileView> discards, int offset, Vector3 tableCenter)
+        private void UpdateSeatDiscards(IReadOnlyList<TileView> discards, int offset)
         {
             var existingTiles = _seatTileObjects[offset];
 
@@ -129,17 +127,9 @@ namespace Mahjong.View
                 return;
             }
 
-            // 配置位置を回転させるための角度と、牌自体の向きを回転させるための角度は別物のため分ける
-            // （どちらも90度×offsetで席の位置に合わせるが、牌の向きにだけ+180度の補正が要る）
-            var positionRotation = Quaternion.Euler(0.0f, 90.0f * offset, 0.0f);
-            // +180度は、牌のデフォルト姿勢を真上から見ると絵柄が上下逆になるための補正
-            // （TileIconCacheのアイコン撮影カメラで必要だったZ=180の補正と同じ理由）
-            var facingRotation = Quaternion.Euler(0.0f, 90.0f * offset + 180.0f, 0.0f);
-            var localNearZ = -TableLayout.DISCARD_ROW_DISTANCE_FROM_CENTER;
-
             for (var index = existingTiles.Count; index < discards.Count; index++)
             {
-                var tileObject = PlaceDiscardTile(discards[index], index, positionRotation, facingRotation, localNearZ, tableCenter);
+                var tileObject = PlaceDiscardTile(discards[index], index, offset);
 
                 if (tileObject != null)
                 {
@@ -152,7 +142,11 @@ namespace Mahjong.View
         /// 「自分（offset=0）が手前で正面を向いている」座標系で位置を組み立てた後、
         /// 卓の中心を軸に90度×offset回転させて、その席の位置・向きに変換する
         /// </summary>
-        private GameObject PlaceDiscardTile(TileView tile, int index, Quaternion positionRotation, Quaternion facingRotation, float localNearZ, Vector3 tableCenter)
+        /// <param name="tile">配置する牌</param>
+        /// <param name="index">河の中での何枚目か（0から数える）</param>
+        /// <param name="offset">自分から見た相対位置（0=自分, 1=下家, 2=対面, 3=上家）</param>
+        /// <returns>配置した牌のGameObject。メッシュが読み込めない場合はnull</returns>
+        private GameObject PlaceDiscardTile(TileView tile, int index, int offset)
         {
             var prefab = TileMeshLibrary.LoadPrefab(tile);
 
@@ -178,26 +172,24 @@ namespace Mahjong.View
             var row = index / TILES_PER_ROW;
             var col = index % TILES_PER_ROW;
             var localX = rowStartX + col * tileWidth + reference.size.x * 0.5f;
-            var localZ = localNearZ - row * rowDepth;
+            var localZ = -TableLayout.DISCARD_ROW_DISTANCE_FROM_CENTER - row * rowDepth;
 
             // 機械的に整列しすぎないよう、位置・向きに小さなランダムなずれを加える
             // （このメソッドは新規に増えた牌にしか呼ばれないため、既に配置済みの牌のずれは変わらない）
             var jitterX = Random.Range(-POSITION_JITTER_RANGE, POSITION_JITTER_RANGE);
             var jitterZ = Random.Range(-POSITION_JITTER_RANGE, POSITION_JITTER_RANGE);
-            var localPosition = new Vector3(localX + jitterX, 0.0f, localZ + jitterZ);
-            var rotatedOffset = positionRotation * localPosition;
+            var jitterRotation = Quaternion.Euler(0.0f, Random.Range(-ROTATION_JITTER_DEGREES, ROTATION_JITTER_DEGREES), 0.0f);
 
             // 牌の底面が卓の設置面に揃うよう、実測バウンディングボックスからYを補正する
             // （ピボットが牌の中心にあるため、そのままだと底面が沈んだり浮いたりする）
-            var restY = TableLayout.SURFACE_Y - localBounds.min.y;
-            var worldPosition = new Vector3(
-                tableCenter.x + rotatedOffset.x,
-                restY,
-                tableCenter.z + rotatedOffset.z);
-            var jitterRotation = Quaternion.Euler(0.0f, Random.Range(-ROTATION_JITTER_DEGREES, ROTATION_JITTER_DEGREES), 0.0f);
+            var localPosition = new Vector3(
+                localX + jitterX,
+                TableLayout.SURFACE_Y - localBounds.min.y,
+                localZ + jitterZ);
 
-            tileObject.transform.position = worldPosition;
-            tileObject.transform.rotation = facingRotation * jitterRotation;
+            tileObject.transform.SetPositionAndRotation(
+                TableLayout.ToWorldPosition(localPosition, offset),
+                TableLayout.GetFlatTileRotation(offset) * jitterRotation);
 
             return tileObject;
         }

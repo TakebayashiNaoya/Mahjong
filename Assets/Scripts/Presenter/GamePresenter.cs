@@ -3,6 +3,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using Cysharp.Threading.Tasks;
+using Mahjong.Model.Common;
 using Mahjong.Model.Cpu;
 using Mahjong.Model.Game;
 using Mahjong.Model.Hands;
@@ -84,6 +85,12 @@ namespace Mahjong.Presenter
         /// 他家の手牌は中身を公開しないため、枚数とツモ牌の有無だけを渡して伏せ牌として表示させる
         /// </summary>
         public ReactiveProperty<IReadOnlyList<ConcealedHandView>> ConcealedHands { get; } = new(System.Array.Empty<ConcealedHandView>());
+        /// <summary>
+        /// 全プレイヤーの副露
+        /// 並びは PlayerDiscards と同じく自分から見た相対位置（0=自分, 1=下家, 2=対面, 3=上家）
+        /// 3D表示View層はこれを購読して卓上に面子を並べる
+        /// </summary>
+        public ReactiveProperty<IReadOnlyList<IReadOnlyList<MeldView>>> PlayerMelds { get; } = new(System.Array.Empty<IReadOnlyList<MeldView>>());
 
 
         // ========================================
@@ -334,19 +341,14 @@ namespace Mahjong.Presenter
 
                     sb.AppendLine($"{marker}P{i} {player.SeatWind} {player.Score}点{riichi}");
 
-                    // 手牌（自分は2D、他家は伏せ牌）と河は3D表示に譲るため、テキストとしては出力しない
-                    // 副露は麻雀では公開情報であり、まだ3D表示していないためテキストに残す
-                    var melds = FormatMelds(player.Hand);
-
-                    if (melds.Length > 0)
-                    {
-                        sb.AppendLine($"    副露: {melds}");
-                    }
+                    // 手牌（自分は2D、他家は伏せ牌）・河・副露はすべて3D表示に譲るため、
+                    // テキストとしては出力しない
                 }
 
                 HumanHand.Value = BuildHumanHand();
                 PlayerDiscards.Value = BuildPlayerDiscards();
                 ConcealedHands.Value = BuildConcealedHands();
+                PlayerMelds.Value = BuildPlayerMelds();
             }
 
             sb.AppendLine();
@@ -412,11 +414,62 @@ namespace Mahjong.Presenter
             return result;
         }
         /// <summary>
-        /// 副露のみを文字列化する（門前牌・ツモ牌は含まない。無ければ空文字列）
+        /// 全プレイヤーの副露を、自分から見た相対位置（0=自分, 1=下家, 2=対面, 3=上家）順に
+        /// 組み立てる
         /// </summary>
-        private static string FormatMelds(Hand hand)
+        private IReadOnlyList<IReadOnlyList<MeldView>> BuildPlayerMelds()
         {
-            return string.Join("  ", hand.Melds.Select(meld => meld.ToString()));
+            var playerCount = _game.Players.Count;
+            var result = new List<IReadOnlyList<MeldView>>(playerCount);
+
+            for (var offset = 0; offset < playerCount; offset++)
+            {
+                var playerIndex = (_humanPlayerIndex + offset) % playerCount;
+                var player = _game.Players[playerIndex];
+                var melds = player.Hand.Melds
+                    .Select(meld => BuildMeldView(meld, player.SeatWind, playerCount))
+                    .ToList();
+
+                result.Add(melds);
+            }
+
+            return result;
+        }
+        /// <summary>
+        /// 副露1組を表示用データに変換する
+        /// </summary>
+        private static MeldView BuildMeldView(Meld meld, Wind seatWind, int playerCount)
+        {
+            var tiles = meld.Tiles.Select(TileView.FromModel).ToList();
+            return new MeldView(tiles, ResolveRotatedTileIndex(meld, seatWind, playerCount));
+        }
+        /// <summary>
+        /// 鳴いた相手から、横向きに置く牌のインデックスを求める
+        /// 上家からなら左端、対面なら左から2枚目、下家なら右端に置く（実際の卓上の慣習に合わせる）
+        /// 三人麻雀には対面が無いため、上家・下家の2方向だけになる
+        /// </summary>
+        /// <returns>横向きに置く牌のインデックス。暗槓の場合は MeldView.NO_ROTATED_TILE_INDEX</returns>
+        private static int ResolveRotatedTileIndex(Meld meld, Wind seatWind, int playerCount)
+        {
+            if (meld.FromWind == null)
+            {
+                return MeldView.NO_ROTATED_TILE_INDEX;
+            }
+
+            // 自風から見て何席後ろの相手かを求める（1=下家, playerCount-1=上家, 2=対面）
+            var direction = ((int)meld.FromWind.Value - (int)seatWind + playerCount) % playerCount;
+
+            if (direction == 1)
+            {
+                return meld.Tiles.Count - 1;
+            }
+
+            if (direction == playerCount - 1)
+            {
+                return 0;
+            }
+
+            return 1;
         }
     }
 }

@@ -37,12 +37,6 @@ namespace Mahjong.View
         /// 削除済みのHandTileFieldViewで使っていたTileRotationと同じ
         /// </summary>
         private static readonly Quaternion BaseTileRotation = Quaternion.Euler(90.0f, 0.0f, 180.0f);
-        /// <summary>
-        /// 基準サイズの計測用に牌を一時的に配置する座標
-        /// 計測用の牌は同フレーム内では破棄されない（Destroyはフレーム末に効く）ため、
-        /// 卓の上に置くと1フレームだけ映り込む。それを避けるために原点から大きく離す
-        /// </summary>
-        private static readonly Vector3 MeasurePosition = new(10000.0f, 10000.0f, 10000.0f);
 
 
         // ========================================
@@ -109,12 +103,10 @@ namespace Mahjong.View
                 return;
             }
 
-            var tableCenter = TableLayout.ResolveCenter();
-
             // offset=0は自分自身（2Dアイコンで表示済み）のためスキップする
             for (var offset = 1; offset < hands.Count; offset++)
             {
-                UpdateSeatHand(hands[offset], offset, prefab, tableCenter);
+                UpdateSeatHand(hands[offset], offset, prefab);
             }
         }
         /// <summary>
@@ -124,8 +116,7 @@ namespace Mahjong.View
         /// <param name="hand">その席の伏せ手牌</param>
         /// <param name="offset">自分から見た相対位置（1=下家, 2=対面, 3=上家）</param>
         /// <param name="prefab">伏せ牌メッシュのプレハブ</param>
-        /// <param name="tableCenter">卓の中心のワールド座標</param>
-        private void UpdateSeatHand(ConcealedHandView hand, int offset, GameObject prefab, Vector3 tableCenter)
+        private void UpdateSeatHand(ConcealedHandView hand, int offset, GameObject prefab)
         {
             if (!_seatHands.TryGetValue(offset, out var seat))
             {
@@ -137,7 +128,7 @@ namespace Mahjong.View
 
             if (isConcealedRowChanged)
             {
-                RebuildConcealedRow(seat, hand.ConcealedTileCount, offset, prefab, tableCenter);
+                RebuildConcealedRow(seat, hand.ConcealedTileCount, offset, prefab);
 
                 // 門前牌の並びが変わるとツモ牌の位置もずれるため、いったん取り除いて置き直す
                 DestroyDrawnTile(seat);
@@ -156,7 +147,7 @@ namespace Mahjong.View
 
             // 門前牌の右端から隙間を1つ空けた位置に置く
             var drawnTileIndex = seat.ConcealedTileCount + DRAWN_TILE_GAP_FACTOR;
-            seat.DrawnTile = PlaceTile(drawnTileIndex, seat.ConcealedTileCount, offset, prefab, tableCenter);
+            seat.DrawnTile = PlaceTile(drawnTileIndex, offset, prefab);
         }
         /// <summary>
         /// 門前牌の列を作り直す
@@ -165,8 +156,7 @@ namespace Mahjong.View
         /// <param name="concealedTileCount">門前牌の枚数</param>
         /// <param name="offset">自分から見た相対位置（1=下家, 2=対面, 3=上家）</param>
         /// <param name="prefab">伏せ牌メッシュのプレハブ</param>
-        /// <param name="tableCenter">卓の中心のワールド座標</param>
-        private void RebuildConcealedRow(SeatHand seat, int concealedTileCount, int offset, GameObject prefab, Vector3 tableCenter)
+        private void RebuildConcealedRow(SeatHand seat, int concealedTileCount, int offset, GameObject prefab)
         {
             foreach (var tileObject in seat.ConcealedTiles)
             {
@@ -178,7 +168,7 @@ namespace Mahjong.View
 
             for (var index = 0; index < concealedTileCount; index++)
             {
-                seat.ConcealedTiles.Add(PlaceTile(index, concealedTileCount, offset, prefab, tableCenter));
+                seat.ConcealedTiles.Add(PlaceTile(index, offset, prefab));
             }
         }
         /// <summary>
@@ -187,32 +177,30 @@ namespace Mahjong.View
         /// 卓の中心を軸に90度×offset回転させて、その席の位置・向きに変換する
         /// </summary>
         /// <param name="indexInRow">列の左端から数えた位置（ツモ牌のように隙間を空ける場合は小数もとる）</param>
-        /// <param name="concealedTileCount">列の中央揃えの基準にする門前牌の枚数</param>
         /// <param name="offset">自分から見た相対位置（1=下家, 2=対面, 3=上家）</param>
         /// <param name="prefab">伏せ牌メッシュのプレハブ</param>
-        /// <param name="tableCenter">卓の中心のワールド座標</param>
         /// <returns>配置した牌のGameObject</returns>
-        private GameObject PlaceTile(float indexInRow, int concealedTileCount, int offset, GameObject prefab, Vector3 tableCenter)
+        private GameObject PlaceTile(float indexInRow, int offset, GameObject prefab)
         {
             var reference = ResolveReferenceBounds(prefab);
             var tileWidth = reference.size.x * (1.0f + TILE_MARGIN_FACTOR);
 
-            // 中央揃えの基準を門前牌の枚数だけにすることで、ツモ牌の有無で門前牌が左右にずれないようにする
-            var startX = -tileWidth * concealedTileCount * 0.5f;
+            // 左端を門前の最大枚数から決めることで、鳴いて枚数が減っても残った牌が動かない
+            // （現在の枚数で中央揃えにすると、鳴くたびに列全体が左右にずれてしまう）
+            var startX = -tileWidth * TableLayout.CONCEALED_HAND_SLOT_COUNT * 0.5f;
             var localX = startX + indexInRow * tileWidth + reference.size.x * 0.5f;
 
-            var positionRotation = Quaternion.Euler(0.0f, 90.0f * offset, 0.0f);
-            var localPosition = new Vector3(localX, 0.0f, -TableLayout.CONCEALED_HAND_DISTANCE_FROM_CENTER);
-            var rotatedOffset = positionRotation * localPosition;
-
             // ピボットが牌の中心にあるため、底面が卓の設置面に揃うようYを補正する
-            var worldPosition = new Vector3(
-                tableCenter.x + rotatedOffset.x,
+            var localPosition = new Vector3(
+                localX,
                 TableLayout.SURFACE_Y - reference.min.y,
-                tableCenter.z + rotatedOffset.z);
+                -TableLayout.CONCEALED_HAND_DISTANCE_FROM_CENTER);
 
             var tileObject = Instantiate(prefab, _fieldRoot);
-            tileObject.transform.SetPositionAndRotation(worldPosition, positionRotation * BaseTileRotation);
+            tileObject.transform.SetPositionAndRotation(
+                TableLayout.ToWorldPosition(localPosition, offset),
+                TableLayout.GetSeatRotation(offset) * BaseTileRotation);
+
             return tileObject;
         }
         /// <summary>
@@ -238,12 +226,7 @@ namespace Mahjong.View
                 return _referenceBounds.Value;
             }
 
-            var tempInstance = Instantiate(prefab, MeasurePosition, BaseTileRotation);
-            var bounds = TileMeshLibrary.MeasureBounds(tempInstance);
-            Destroy(tempInstance);
-
-            // MeasureBoundsはワールド座標基準のため、計測用に離した分を引いてピボット基準に直す
-            _referenceBounds = new Bounds(bounds.center - MeasurePosition, bounds.size);
+            _referenceBounds = TileMeshLibrary.MeasurePrefabBounds(prefab, BaseTileRotation);
             return _referenceBounds.Value;
         }
         /// <summary>

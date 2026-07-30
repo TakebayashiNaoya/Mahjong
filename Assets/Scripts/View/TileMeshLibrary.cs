@@ -17,6 +17,11 @@ namespace Mahjong.View
         /// 牌メッシュの読み込み元フォルダ（Resources基準の相対パス）
         /// </summary>
         private const string MESH_RESOURCE_ROOT = "Mahjong Complete Set/Mesh/";
+        /// <summary>
+        /// サイズ計測用に牌を一時的に配置する座標
+        /// シーン上の他オブジェクトと絶対に重ならないよう、原点から大きく離す
+        /// </summary>
+        private static readonly Vector3 MeasurePosition = new(10000.0f, 10000.0f, 10000.0f);
 
 
         // ========================================
@@ -76,6 +81,22 @@ namespace Mahjong.View
             }
 
             return prefab;
+        }
+        /// <summary>
+        /// プレハブを指定の姿勢で置いたときの、ピボットを原点としたバウンディングボックスを計測する
+        /// 計測用のインスタンスは原点から大きく離した位置に生成する
+        /// （Destroyはフレーム末に効くため、卓の上に生成すると1フレームだけ映り込む）
+        /// 実行時専用（Destroyを使うため、Editモードからは呼べない）
+        /// </summary>
+        /// <param name="prefab">計測する牌メッシュのプレハブ</param>
+        /// <param name="rotation">計測時の姿勢</param>
+        public static Bounds MeasurePrefabBounds(GameObject prefab, Quaternion rotation)
+        {
+            var instance = Object.Instantiate(prefab, MeasurePosition, rotation);
+            var bounds = MeasureBounds(instance);
+            Object.Destroy(instance);
+
+            return new Bounds(bounds.center - MeasurePosition, bounds.size);
         }
         /// <summary>
         /// GameObject配下の全Rendererを合成したバウンディングボックスを計測する
