@@ -651,6 +651,13 @@ namespace Mahjong.Model.Game
                     options.Add(new CallOption(i, CallType.Ron, new List<IReadOnlyList<Tile>> { new List<Tile> { discardedTile } }));
                 }
 
+                // リーチ後は手牌を変えられないため、他家の捨て牌に対してはロンしか宣言できない
+                // （リーチ後に認められる暗槓は自分のツモ番の宣言であり、ここでは扱わない）
+                if (player.HandState.IsRiichi)
+                {
+                    continue;
+                }
+
                 var matching = player.Hand.GetClosedTiles().Where(t => t.IsSameType(discardedTile)).ToList();
 
                 if (matching.Count >= 3)
