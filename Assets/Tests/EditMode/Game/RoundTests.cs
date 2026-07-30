@@ -195,6 +195,35 @@ namespace Mahjong.Model.Game.Tests
             Assert.AreEqual(TurnPhase.AwaitingReactions, round.Phase);
         }
 
+        [Test]
+        public void GetAvailableCalls_PlayerNotInRiichi_OffersRonAndPon()
+        {
+            var round = CreateRound(out var players, playerCount: 4, dealerIndex: 0, seed: 11);
+
+            SetUpRonAndPonHands(players);
+            round.Discard(S(3));
+            var options = round.GetAvailableCalls(S(3), 0);
+
+            Assert.IsTrue(options.Any(o => o.PlayerIndex == 1 && o.Type == CallType.Ron));
+            Assert.IsTrue(options.Any(o => o.PlayerIndex == 1 && o.Type == CallType.Pon));
+        }
+
+        [Test]
+        public void GetAvailableCalls_PlayerInRiichi_OffersRonOnly()
+        {
+            var round = CreateRound(out var players, playerCount: 4, dealerIndex: 0, seed: 11);
+
+            SetUpRonAndPonHands(players);
+            players[1].HandState.DeclareRiichi(turnIndex: 0);
+
+            round.Discard(S(3));
+            var options = round.GetAvailableCalls(S(3), 0);
+
+            // リーチ後は手牌を変えられないため、ロン以外は宣言できない
+            Assert.IsTrue(options.Any(o => o.PlayerIndex == 1 && o.Type == CallType.Ron));
+            Assert.IsFalse(options.Any(o => o.PlayerIndex == 1 && o.Type != CallType.Ron));
+        }
+
 
         // ========================================
         // 途中流局
@@ -271,6 +300,24 @@ namespace Mahjong.Model.Game.Tests
         // ========================================
         // テストヘルパー
         // ========================================
+        /// <summary>
+        /// P1に「3索でロンもポンもできる手牌」を、P0に捨てる3索を配る
+        /// P1の手牌は 234m 234p 678p 33s 45s（3-6索待ち。3索は暗刻の2枚も持っている）
+        /// </summary>
+        private static void SetUpRonAndPonHands(IReadOnlyList<PlayerState> players)
+        {
+            players[1].Hand.SetInitialTiles(new List<Tile>
+            {
+                M(2), M(3), M(4), P(2), P(3), P(4), P(6), P(7), P(8), S(3), S(3), S(4), S(5),
+            });
+
+            players[0].Hand.SetInitialTiles(new List<Tile>
+            {
+                S(3), M(1), M(1), M(1), P(1), P(1), P(1), S(1), S(1), S(1),
+                Z(TileId.East), Z(TileId.East), Z(TileId.East),
+            });
+        }
+
         private static Round CreateRound(out List<PlayerState> players, int playerCount, int dealerIndex, int seed)
         {
             var settings = GameSettings.CreateDefault(playerCount, GameLengthType.HalfGame);
