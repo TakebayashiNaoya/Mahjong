@@ -104,7 +104,10 @@ namespace Mahjong.Model.Hands
         /// ツモ牌または手牌から1枚を捨て、ソートし直す
         /// tile がツモ牌・手牌のどちらかに参照として存在する場合はその牌自身を捨てる
         /// （赤ドラと通常牌は IsSameType では同種として扱われるため、参照で区別できる場合は
-        /// 必ず参照を優先しないと、意図した牌と異なる牌を捨ててしまう）
+        /// 必ず参照を優先しないと、意図した牌と異なる牌を捨ててしまう。
+        /// Tile は Equals をオーバーライドしていないため、List.Contains 等の既定の比較でも
+        /// 結果的に参照比較になるが、将来 Tile に値ベースの Equals が実装された場合に
+        /// この前提が静かに崩れないよう、ここでは ReferenceEquals を明示的に使う）
         /// 参照が一致しない場合（テストなどで複製した牌を渡す場合）は種類で一致する牌を探し、
         /// 同種の牌が複数あるときはツモ牌を優先して捨てる
         /// </summary>
@@ -126,9 +129,11 @@ namespace Mahjong.Model.Hands
                 return discardedDrawnTile;
             }
 
-            if (_tiles.Contains(tile))
+            var handIndex = _tiles.FindIndex(t => ReferenceEquals(t, tile));
+
+            if (handIndex >= 0)
             {
-                _tiles.Remove(tile);
+                _tiles.RemoveAt(handIndex);
                 MergeDrawnTileIntoHandAndSort();
                 return tile;
             }

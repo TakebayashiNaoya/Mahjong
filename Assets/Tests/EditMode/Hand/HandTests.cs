@@ -33,6 +33,7 @@ namespace Mahjong.Model.Hands.Tests
             Assert.AreSame(normalFive, discarded);
             Assert.IsFalse(discarded.IsRed);
             Assert.IsNull(hand.DrawnTile);
+            Assert.IsFalse(hand.Tiles.Contains(normalFive));
             Assert.IsTrue(hand.Tiles.Contains(redFive));
         }
     }
