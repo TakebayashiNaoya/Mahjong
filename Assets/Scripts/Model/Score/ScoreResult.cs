@@ -1,4 +1,7 @@
-﻿namespace Mahjong.Model.Scoring
+﻿using System.Collections.Generic;
+using Mahjong.Model.Evaluation;
+
+namespace Mahjong.Model.Scoring
 {
     /// <summary>
     /// 点数計算の最終結果
@@ -44,6 +47,18 @@
         /// 支払い内訳
         /// </summary>
         public PaymentBreakdown Payment { get; }
+        /// <summary>
+        /// 成立した役の内訳（ドラを除く）
+        /// </summary>
+        public IReadOnlyList<YakuResult> Yaku { get; }
+        /// <summary>
+        /// 表ドラ・裏ドラ・北抜きによる翻数の合計。役満成立時は0
+        /// </summary>
+        public int DoraHan { get; }
+        /// <summary>
+        /// 赤ドラによる翻数。役満成立時は0
+        /// </summary>
+        public int AkaDoraHan { get; }
 
 
         // ========================================
@@ -51,7 +66,8 @@
         // ========================================
         public ScoreResult(
             int fu, int han, LimitBand band, bool isYakuman, int yakumanMultiplier,
-            int basicPoints, int honbaCount, int riichiStickCount, PaymentBreakdown payment)
+            int basicPoints, int honbaCount, int riichiStickCount, PaymentBreakdown payment,
+            IReadOnlyList<YakuResult> yaku, int doraHan, int akaDoraHan)
         {
             Fu = fu;
             Han = han;
@@ -62,6 +78,9 @@
             HonbaCount = honbaCount;
             RiichiStickCount = riichiStickCount;
             Payment = payment;
+            Yaku = yaku;
+            DoraHan = doraHan;
+            AkaDoraHan = akaDoraHan;
         }
     }
 }

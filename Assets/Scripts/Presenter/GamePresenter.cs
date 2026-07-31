@@ -7,6 +7,7 @@ using Mahjong.Model.Common;
 using Mahjong.Model.Cpu;
 using Mahjong.Model.Game;
 using Mahjong.Model.Hands;
+using Mahjong.Model.Scoring;
 using Mahjong.Model.Tiles;
 using R3;
 using UnityEngine;
@@ -47,9 +48,10 @@ namespace Mahjong.Presenter
         private int _stepDelayMilliseconds = 250;
         /// <summary>
         /// 局が終わってから次局を始めるまでに空ける時間（ミリ秒）
+        /// この間、和了・流局の結果画面（RoundResultDisplay）を表示し続ける
         /// </summary>
         [SerializeField]
-        private int _roundIntervalMilliseconds = 2000;
+        private int _roundIntervalMilliseconds = 6000;
         /// <summary>
         /// 人間が操作する席（それ以外はすべてCPU）
         /// </summary>
@@ -92,6 +94,12 @@ namespace Mahjong.Presenter
         /// 3D表示View層はこれを購読して卓上に面子を並べる
         /// </summary>
         public ReactiveProperty<IReadOnlyList<IReadOnlyList<MeldView>>> PlayerMelds { get; } = new(System.Array.Empty<IReadOnlyList<MeldView>>());
+        /// <summary>
+        /// 直近に終了した局の和了・流局結果
+        /// 局が終わってから次局が始まるまでの間だけ値を持ち、それ以外は null
+        /// （Mahjong.Model.Game.RoundResult と名前が衝突するため RoundResultDisplay という名前にしている）
+        /// </summary>
+        public ReactiveProperty<RoundResultView> RoundResultDisplay { get; } = new(null);
 
 
         // ========================================
@@ -142,12 +150,15 @@ namespace Mahjong.Presenter
                 Refresh();
 
                 var result = await PlayRoundAsync(ct);
+                var resultView = BuildRoundResultView(result);
                 _game.ApplyRoundResult(result);
 
                 AppendLog(DescribeResult(result));
+                RoundResultDisplay.Value = resultView;
                 Refresh();
 
                 await UniTask.Delay(_roundIntervalMilliseconds, cancellationToken: ct);
+                RoundResultDisplay.Value = null;
             }
 
             AppendLog("=== ゲーム終了 ===");
@@ -321,6 +332,139 @@ namespace Mahjong.Presenter
                 RoundEndReason.AbortiveDraw => $"途中流局: {result.AbortiveReason}",
                 _ => result.Reason.ToString(),
             };
+        }
+        /// <summary>
+        /// 局の結果を、和了・流局画面向けの表示用データに組み立てる
+        /// Round は次局開始（StartNextRound）で手牌・河をリセットするため、それより前に呼ぶ必要がある
+        /// </summary>
+        private RoundResultView BuildRoundResultView(RoundResult result)
+        {
+            var roundLabel = $"{_round.RoundWind}{_round.RoundNumber}局 {_round.HonbaCount}本場";
+            var reasonLabel = BuildReasonLabel(result);
+            var wins = result.Wins.Select(BuildWinResultView).ToList();
+
+            return new RoundResultView(roundLabel, reasonLabel, wins, result.ScoreDeltas, result.TenpaiStates);
+        }
+        /// <summary>
+        /// 局の終了理由を表示文字列に整形する
+        /// </summary>
+        private static string BuildReasonLabel(RoundResult result)
+        {
+            return result.Reason switch
+            {
+                RoundEndReason.Tsumo => "ツモ和了",
+                RoundEndReason.Ron => "ロン和了",
+                RoundEndReason.ExhaustiveDraw => "荒牌平局",
+                RoundEndReason.AbortiveDraw => $"途中流局: {DescribeAbortiveReason(result.AbortiveReason)}",
+                _ => result.Reason.ToString(),
+            };
+        }
+        /// <summary>
+        /// 途中流局の理由を日本語表示名に変換する
+        /// </summary>
+        private static string DescribeAbortiveReason(AbortiveDrawReason? reason)
+        {
+            return reason switch
+            {
+                AbortiveDrawReason.KyuushuKyuuhai => "九種九牌",
+                AbortiveDrawReason.SuufuRenda => "四風連打",
+                AbortiveDrawReason.SuuKaiSanra => "四槓散了",
+                AbortiveDrawReason.Sanchaho => "三家和",
+                null => string.Empty,
+                _ => reason.ToString(),
+            };
+        }
+        /// <summary>
+        /// 和了1件分を表示用データに変換する
+        /// </summary>
+        private WinResultView BuildWinResultView(WinOutcome outcome)
+        {
+            var winner = _round.Players[outcome.WinnerIndex];
+            var isTsumo = outcome.DiscarderIndex == null;
+            var isDealer = outcome.WinnerIndex == _round.DealerIndex;
+            var discarderSeatWind = outcome.DiscarderIndex.HasValue
+                ? _round.Players[outcome.DiscarderIndex.Value].SeatWind
+                : (Wind?)null;
+
+            var yakuLines = outcome.Score.Yaku
+                .Select(y => new YakuLineView(YakuDisplayNames.GetName(y.Id), y.IsYakuman ? y.YakumanMultiplier : y.Han))
+                .ToList();
+
+            var melds = winner.Hand.Melds
+                .Select(meld => BuildMeldView(meld, winner.SeatWind, _game.Players.Count))
+                .ToList();
+
+            return new WinResultView(
+                FormatSeatLabel(winner.SeatWind, isDealer), FormatSourceLabel(isTsumo, discarderSeatWind),
+                outcome.Score.IsYakuman, yakuLines, outcome.Score.DoraHan, outcome.Score.AkaDoraHan,
+                outcome.Score.Fu, outcome.Score.Han, YakuDisplayNames.GetLimitBandLabel(outcome.Score.Band),
+                FormatPointsLabel(isDealer, outcome.Score.Payment), BuildWinningHandTiles(winner, outcome, isTsumo), melds);
+        }
+        /// <summary>
+        /// 席を表す表示文字列を組み立てる（例: "東家（親）"）
+        /// </summary>
+        private static string FormatSeatLabel(Wind seatWind, bool isDealer)
+        {
+            var windLabel = FormatWindLabel(seatWind);
+            return isDealer ? $"{windLabel}家（親）" : $"{windLabel}家";
+        }
+        /// <summary>
+        /// 和了の種類を表す表示文字列を組み立てる（例: "ツモ", "ロン（放銃: 西家）"）
+        /// </summary>
+        private static string FormatSourceLabel(bool isTsumo, Wind? discarderSeatWind)
+        {
+            return isTsumo ? "ツモ" : $"ロン（放銃: {FormatWindLabel(discarderSeatWind.Value)}家）";
+        }
+        /// <summary>
+        /// 風の日本語表示名を返す
+        /// </summary>
+        private static string FormatWindLabel(Wind wind)
+        {
+            return wind switch
+            {
+                Wind.East => "東",
+                Wind.South => "南",
+                Wind.West => "西",
+                Wind.North => "北",
+                _ => wind.ToString(),
+            };
+        }
+        /// <summary>
+        /// 和了時の手牌（門前牌＋和了牌）を組み立てる
+        /// ロンの和了牌はまだ手牌に含まれていないため、放銃者の最後の捨て牌から補う
+        /// </summary>
+        private IReadOnlyList<TileView> BuildWinningHandTiles(PlayerState winner, WinOutcome outcome, bool isTsumo)
+        {
+            var tiles = winner.Hand.Tiles.Select(TileView.FromModel).ToList();
+
+            if (isTsumo)
+            {
+                if (winner.Hand.DrawnTile != null)
+                {
+                    tiles.Add(TileView.FromModel(winner.Hand.DrawnTile));
+                }
+            }
+            else
+            {
+                var discarder = _round.Players[outcome.DiscarderIndex.Value];
+                tiles.Add(TileView.FromModel(discarder.Discards[^1]));
+            }
+
+            return tiles;
+        }
+        /// <summary>
+        /// 点数を表す表示文字列を組み立てる（例: "親ロン 11600点", "子ツモ 2000/3900点"）
+        /// </summary>
+        private static string FormatPointsLabel(bool isDealer, PaymentBreakdown payment)
+        {
+            if (payment.IsTsumo)
+            {
+                return isDealer
+                    ? $"親ツモ {payment.NonDealerPaymentAmount}点オール"
+                    : $"子ツモ {payment.NonDealerPaymentAmount}/{payment.DealerPaymentAmount}点";
+            }
+
+            return isDealer ? $"親ロン {payment.DiscarderAmount}点" : $"子ロン {payment.DiscarderAmount}点";
         }
         /// <summary>
         /// 現在の対局・局の状態から表示テキストを組み立てる

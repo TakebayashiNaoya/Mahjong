@@ -67,9 +67,14 @@ namespace Mahjong.Model.Scoring
             var payment = PaymentCalculator.Calculate(
                 table.BasicPoints, context.IsDealer, context.IsTsumo, honbaCount, riichiStickCount, playerCount);
 
+            // 役満ではドラが翻数に加算されないため、表示上もドラ0として揃える
+            var displayedDoraHan = yakuResult.IsYakuman ? 0 : indicatorDoraHan;
+            var displayedAkaDoraHan = yakuResult.IsYakuman ? 0 : akaDoraHan;
+
             return new ScoreResult(
                 yakuResult.Fu, effectiveHan, table.Band, yakuResult.IsYakuman, yakumanMultiplier,
-                table.BasicPoints, honbaCount, riichiStickCount, payment);
+                table.BasicPoints, honbaCount, riichiStickCount, payment,
+                yakuResult.Yaku, displayedDoraHan, displayedAkaDoraHan);
         }
 
 
