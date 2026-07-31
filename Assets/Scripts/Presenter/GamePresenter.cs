@@ -27,20 +27,11 @@ namespace Mahjong.Presenter
         /// 保持するログ行数の上限
         /// </summary>
         private const int MAX_LOG_LINES = 12;
-        /// <summary>
-        /// このマイルストーンで使用するCPU強度（全席共通）
-        /// </summary>
-        private const CpuDifficulty DIFFICULTY = CpuDifficulty.Normal;
 
 
         // ========================================
         // インスペクタ設定
         // ========================================
-        /// <summary>
-        /// 参加人数（3または4）
-        /// </summary>
-        [SerializeField]
-        private int _playerCount = 4;
         /// <summary>
         /// 各ステップ（ツモ・打牌・副露解決など）の間に空ける時間（ミリ秒）
         /// </summary>
@@ -52,11 +43,6 @@ namespace Mahjong.Presenter
         /// </summary>
         [SerializeField]
         private int _roundIntervalMilliseconds = 6000;
-        /// <summary>
-        /// 人間が操作する席（それ以外はすべてCPU）
-        /// </summary>
-        [SerializeField]
-        private int _humanPlayerIndex = 0;
 
 
         // ========================================
@@ -121,26 +107,33 @@ namespace Mahjong.Presenter
         /// 現在進行中の局
         /// </summary>
         private Round _round;
+        /// <summary>
+        /// 人間が操作する席（それ以外はすべてCPU）。RunAsync で外部から設定される
+        /// </summary>
+        private int _humanPlayerIndex;
+        /// <summary>
+        /// CPU強度（全席共通）。RunAsync で外部から設定される
+        /// </summary>
+        private CpuDifficulty _difficulty;
 
 
         // ========================================
-        // Unityライフサイクル
-        // ========================================
-        private void Start()
-        {
-            RunGameAsync(this.GetCancellationTokenOnDestroy()).Forget();
-        }
-
-
-        // ========================================
-        // プライベートメソッド（進行ループ）
+        // パブリックメソッド（進行ループ）
         // ========================================
         /// <summary>
-        /// 対局全体を進行させる（東風戦・半荘戦が終わるまで局を繰り返す）
+        /// 対局全体を進行させる（東風戦・半荘戦が終わるまで局を繰り返し、ゲーム終了時に最終順位を返す）
+        /// AppFlowPresenter がモード選択・設定画面で決まった内容を渡して呼び出す
         /// </summary>
-        private async UniTaskVoid RunGameAsync(CancellationToken ct)
+        /// <param name="settings">対局設定（人数・東風戦/半荘戦・赤ドラ・北抜きなど）</param>
+        /// <param name="difficulty">CPU強度（全席共通）</param>
+        /// <param name="humanPlayerIndex">人間が操作する席</param>
+        /// <param name="ct">ゲーム全体のキャンセルトークン</param>
+        /// <returns>ゲーム終了時の最終順位</returns>
+        public async UniTask<GameOverSummaryView> RunAsync(
+            GameSettings settings, CpuDifficulty difficulty, int humanPlayerIndex, CancellationToken ct)
         {
-            var settings = GameSettings.CreateDefault(_playerCount, GameLengthType.EastOnly);
+            _humanPlayerIndex = humanPlayerIndex;
+            _difficulty = difficulty;
             _game = new MahjongGame(settings);
 
             while (!_game.IsGameOver)
@@ -163,7 +156,14 @@ namespace Mahjong.Presenter
 
             AppendLog("=== ゲーム終了 ===");
             Refresh();
+
+            return BuildGameOverSummary();
         }
+
+
+        // ========================================
+        // プライベートメソッド（進行ループ）
+        // ========================================
         /// <summary>
         /// 1局を、Round が終了を返すまで進行させる
         /// Assets/Tests/EditMode/CPU/CpuStrategyTests.cs の PlayRoundToCompletion と同じ状態遷移を、
@@ -236,13 +236,13 @@ namespace Mahjong.Presenter
                 return _round.DeclareTsumoWin();
             }
 
-            if (_round.CanDeclareKyuushuKyuuhai() && CpuStrategy.ShouldDeclareKyuushuKyuuhai(_round, playerIndex, DIFFICULTY))
+            if (_round.CanDeclareKyuushuKyuuhai() && CpuStrategy.ShouldDeclareKyuushuKyuuhai(_round, playerIndex, _difficulty))
             {
                 AppendLog($"P{playerIndex} 九種九牌");
                 return _round.DeclareKyuushuKyuuhai();
             }
 
-            if (_round.Settings.UseKitaNuki && _round.CanDeclareKitaNuki() && CpuStrategy.ShouldDeclareKitaNuki(_round, playerIndex, DIFFICULTY))
+            if (_round.Settings.UseKitaNuki && _round.CanDeclareKitaNuki() && CpuStrategy.ShouldDeclareKitaNuki(_round, playerIndex, _difficulty))
             {
                 AppendLog($"P{playerIndex} 北抜き");
                 _round.DeclareKitaNuki();
@@ -332,6 +332,20 @@ namespace Mahjong.Presenter
                 RoundEndReason.AbortiveDraw => $"途中流局: {result.AbortiveReason}",
                 _ => result.Reason.ToString(),
             };
+        }
+        /// <summary>
+        /// ゲーム終了時の最終順位を組み立てる
+        /// 返し点を用いた正式な順位計算は未実装のため、持ち点降順の簡易順位とする（同点は席順を維持）
+        /// </summary>
+        private GameOverSummaryView BuildGameOverSummary()
+        {
+            var standings = _game.Players
+                .Select((player, index) => (player, index))
+                .OrderByDescending(p => p.player.Score)
+                .Select((p, rank) => new PlayerStandingView(rank + 1, p.index, p.index == _humanPlayerIndex, p.player.Score))
+                .ToList();
+
+            return new GameOverSummaryView(standings);
         }
         /// <summary>
         /// 局の結果を、和了・流局画面向けの表示用データに組み立てる

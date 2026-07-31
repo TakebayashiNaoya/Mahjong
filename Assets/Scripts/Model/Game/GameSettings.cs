@@ -87,11 +87,14 @@ namespace Mahjong.Model.Game
         /// </summary>
         /// <param name="playerCount">参加人数（3または4）</param>
         /// <param name="gameLength">東風戦か半荘戦か</param>
-        public static GameSettings CreateDefault(int playerCount, GameLengthType gameLength)
+        /// <param name="useRedDora">赤ドラを使用するかどうか</param>
+        /// <param name="useKitaNuki">北抜きを使用するかどうか（三人麻雀以外では無視される）</param>
+        public static GameSettings CreateDefault(
+            int playerCount, GameLengthType gameLength, bool useRedDora = true, bool useKitaNuki = false)
         {
             var initialScore = playerCount == 3 ? 35000 : 25000;
             var returnScore = playerCount == 3 ? 40000 : 30000;
-            return new GameSettings(playerCount, gameLength, initialScore, returnScore);
+            return new GameSettings(playerCount, gameLength, initialScore, returnScore, useRedDora, useKitaNuki);
         }
     }
 }

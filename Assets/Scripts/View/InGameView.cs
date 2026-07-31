@@ -3,8 +3,6 @@ using System.Collections.Generic;
 using Mahjong.Presenter;
 using R3;
 using UnityEngine;
-using UnityEngine.EventSystems;
-using UnityEngine.InputSystem.UI;
 using UnityEngine.UI;
 
 namespace Mahjong.View
@@ -12,7 +10,7 @@ namespace Mahjong.View
     /// <summary>
     /// GamePresenter.DisplayText を購読して画面全体に表示し、
     /// GamePresenter.Human が公開する選択肢をボタンとして表示する最小View
-    /// シーンに何も配置しなくても、再生するだけで自分自身とGamePresenterを生成する
+    /// AppFlowView が対局用GameObjectに取り付けることで生成される（自分自身では起動しない）
     /// </summary>
     public sealed class InGameView : MonoBehaviour
     {
@@ -104,40 +102,6 @@ namespace Mahjong.View
         /// 現在表示中の手牌アイコン（手牌が更新されるたびにまとめて破棄する）
         /// </summary>
         private readonly List<GameObject> _activeHandTiles = new();
-
-
-        // ========================================
-        // 起動
-        // ========================================
-        /// <summary>
-        /// シーン読み込み後、対局進行役と表示役をまとめて生成する
-        /// シーンファイルを直接編集せずに済ませるため、実行時にすべてコードから組み立てる
-        /// </summary>
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-        private static void Bootstrap()
-        {
-            var root = new GameObject("MahjongGameRoot");
-            root.AddComponent<GamePresenter>();
-            root.AddComponent<InGameView>();
-            root.AddComponent<TableFieldView>();
-            root.AddComponent<RoundResultOverlayView>();
-
-            EnsureEventSystemExists();
-        }
-        /// <summary>
-        /// ボタンのクリックを受け付けるために EventSystem が必要なため、無ければ生成する
-        /// このプロジェクトは Active Input Handling が新Input Systemのみのため、
-        /// 旧来の StandaloneInputModule ではなく InputSystemUIInputModule を使う
-        /// </summary>
-        private static void EnsureEventSystemExists()
-        {
-            if (FindFirstObjectByType<EventSystem>() != null)
-            {
-                return;
-            }
-
-            new GameObject("EventSystem", typeof(EventSystem), typeof(InputSystemUIInputModule));
-        }
 
 
         // ========================================
