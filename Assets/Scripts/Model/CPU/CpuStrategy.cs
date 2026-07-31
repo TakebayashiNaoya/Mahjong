@@ -28,6 +28,7 @@ namespace Mahjong.Model.Cpu
                 throw new ArgumentNullException(nameof(round), "round が null です");
             }
 
+            // playerを取得
             var player = round.Players[playerIndex];
 
             // リーチ済みかつ今回の打牌がその宣言直後ではない場合、ツモ切りが強制される
@@ -38,10 +39,12 @@ namespace Mahjong.Model.Cpu
                 return player.Hand.DrawnTile;
             }
 
+            // 3人打ちかどうかを判定
             var isThreePlayer = round.Settings.PlayerCount == 3;
             var mustKeepTenpai = player.HandState.IsRiichi;
             var safeTiles = FindSafeTiles(round, playerIndex);
 
+            // CpuDiscardSelector に委譲して打牌を決定
             return CpuDiscardSelector.ChooseDiscard(player.Hand, isThreePlayer, mustKeepTenpai, safeTiles, difficulty, random);
         }
         /// <summary>
@@ -63,12 +66,12 @@ namespace Mahjong.Model.Cpu
             {
                 throw new ArgumentNullException(nameof(round), "round が null です");
             }
-
             if (options == null)
             {
                 throw new ArgumentNullException(nameof(options), "options が null です");
             }
 
+            // このプレイヤーの宣言候補のみに絞り込む
             var myOptions = options.Where(o => o.PlayerIndex == playerIndex).ToList();
             return CpuCallSelector.ChooseCall(round.Players[playerIndex].Hand, myOptions, difficulty);
         }

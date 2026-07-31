@@ -18,7 +18,11 @@ namespace Mahjong.Model.Evaluation.Internal
         /// 順子の場合は3枚のうち最小のインデックス
         /// </summary>
         public int KindIndex { get; }
-
+        /// <summary>
+        /// KindGroup のコンストラクタ
+        /// </summary>
+        /// <param name="type">グループ種別</param>
+        /// <param name="kindIndex">グループの起点となる種類インデックス</param>
         public KindGroup(GroupType type, int kindIndex)
         {
             Type = type;
