@@ -102,8 +102,11 @@ namespace Mahjong.Model.Hands
         /// <summary>
         /// 牌を捨てる
         /// ツモ牌または手牌から1枚を捨て、ソートし直す
-        /// 同種の牌が複数ある場合はツモ牌を優先して捨てる
-        /// Sort で赤ドラは通常牌の後ろに並ぶため、通常牌が優先して捨てられる
+        /// tile がツモ牌・手牌のどちらかに参照として存在する場合はその牌自身を捨てる
+        /// （赤ドラと通常牌は IsSameType では同種として扱われるため、参照で区別できる場合は
+        /// 必ず参照を優先しないと、意図した牌と異なる牌を捨ててしまう）
+        /// 参照が一致しない場合（テストなどで複製した牌を渡す場合）は種類で一致する牌を探し、
+        /// 同種の牌が複数あるときはツモ牌を優先して捨てる
         /// </summary>
         /// <param name="tile">捨てる牌</param>
         /// <returns>捨てた牌</returns>
@@ -116,15 +119,29 @@ namespace Mahjong.Model.Hands
                 throw new ArgumentNullException(nameof(tile), "捨てる牌が null です");
             }
 
-            // ツモ牌を捨てる場合
-            if (DrawnTile != null && DrawnTile.IsSameType(tile))
+            if (ReferenceEquals(DrawnTile, tile))
             {
-                var discarded = DrawnTile;
+                var discardedDrawnTile = DrawnTile;
                 DrawnTile = null;
-                return discarded;
+                return discardedDrawnTile;
             }
 
-            // 手牌から捨てる場合
+            if (_tiles.Contains(tile))
+            {
+                _tiles.Remove(tile);
+                MergeDrawnTileIntoHandAndSort();
+                return tile;
+            }
+
+            // ツモ牌を捨てる場合（参照が一致しない、種類だけが一致するケース）
+            if (DrawnTile != null && DrawnTile.IsSameType(tile))
+            {
+                var discardedDrawnTile = DrawnTile;
+                DrawnTile = null;
+                return discardedDrawnTile;
+            }
+
+            // 手牌から捨てる場合（参照が一致しない、種類だけが一致するケース）
             var target = _tiles.FirstOrDefault(t => t.IsSameType(tile));
 
             if (target == null)
@@ -133,15 +150,7 @@ namespace Mahjong.Model.Hands
             }
 
             _tiles.Remove(target);
-
-            // ツモ牌を手牌に移してソートする
-            if (DrawnTile != null)
-            {
-                _tiles.Add(DrawnTile);
-                DrawnTile = null;
-            }
-
-            Sort();
+            MergeDrawnTileIntoHandAndSort();
             return target;
         }
         /// <summary>
@@ -344,6 +353,20 @@ namespace Mahjong.Model.Hands
         // ========================================
         // プライベートメソッド
         // ========================================
+        /// <summary>
+        /// ツモ牌が残っていれば手牌に戻してソートし直す
+        /// Discard で手牌側の牌を捨てたあと、ツモ牌を通常の手牌に合流させるために呼ぶ
+        /// </summary>
+        private void MergeDrawnTileIntoHandAndSort()
+        {
+            if (DrawnTile != null)
+            {
+                _tiles.Add(DrawnTile);
+                DrawnTile = null;
+            }
+
+            Sort();
+        }
         /// <summary>
         /// 手牌をスーツ→数字→赤ドラの順に安定ソートする
         /// ソート順：萬子 → 筒子 → 索子 → 字牌

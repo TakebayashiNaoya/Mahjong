@@ -120,6 +120,7 @@ namespace Mahjong.View
             root.AddComponent<GamePresenter>();
             root.AddComponent<InGameView>();
             root.AddComponent<TableFieldView>();
+            root.AddComponent<RoundResultOverlayView>();
 
             EnsureEventSystemExists();
         }

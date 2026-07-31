@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 using Mahjong.Model.Evaluation;
 using Mahjong.Model.Evaluation.Tests;
 using Mahjong.Model.Tiles;
@@ -36,6 +37,11 @@ namespace Mahjong.Model.Scoring.Tests
             Assert.AreEqual(4, score.Han);
             Assert.AreEqual(1920, score.BasicPoints);
             Assert.AreEqual(11600, score.Payment.DiscarderAmount);
+            Assert.IsTrue(score.Yaku.Any(y => y.Id == YakuId.Riichi));
+            Assert.IsTrue(score.Yaku.Any(y => y.Id == YakuId.Pinfu));
+            Assert.IsTrue(score.Yaku.Any(y => y.Id == YakuId.Tanyao));
+            Assert.AreEqual(1, score.AkaDoraHan);
+            Assert.AreEqual(0, score.DoraHan);
         }
 
         [Test]
@@ -61,6 +67,8 @@ namespace Mahjong.Model.Scoring.Tests
             Assert.IsTrue(score.IsYakuman);
             Assert.AreEqual(8000, score.BasicPoints);
             Assert.AreEqual(32000, score.Payment.DiscarderAmount);
+            Assert.AreEqual(0, score.DoraHan);
+            Assert.AreEqual(0, score.AkaDoraHan);
         }
 
         [Test]
@@ -110,6 +118,8 @@ namespace Mahjong.Model.Scoring.Tests
                 hand, winningTile, yakuResult, context, honbaCount: 0, riichiStickCount: 0, indicatorDoraHan: 2);
 
             Assert.AreEqual(withoutIndicatorDora.Han + 2, withIndicatorDora.Han);
+            Assert.AreEqual(0, withoutIndicatorDora.DoraHan);
+            Assert.AreEqual(2, withIndicatorDora.DoraHan);
         }
 
         [Test]
