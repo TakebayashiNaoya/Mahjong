@@ -74,6 +74,9 @@ namespace Mahjong.View.Editor
             }
 
             importer.textureType = TextureImporterType.Sprite;
+            // spriteImportMode を明示しないと Multiple のまま（スプライト未定義）でインポートされることがあり、
+            // その場合 Resources.Load<Sprite> が常に null を返して焼き込みアイコンが一切使われなくなる
+            importer.spriteImportMode = SpriteImportMode.Single;
             importer.alphaIsTransparency = true;
             importer.mipmapEnabled = false;
             importer.SaveAndReimport();

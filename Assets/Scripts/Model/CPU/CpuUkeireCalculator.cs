@@ -28,6 +28,7 @@ namespace Mahjong.Model.Cpu
                 throw new ArgumentNullException(nameof(hand), "hand が null です");
             }
 
+            // 34種のカウント配列に変換してから CountUkeireKinds(int[], int, bool) に委譲する
             return CountUkeireKinds(ShantenCalculator.BuildCounts(hand), hand.Melds.Count, isThreePlayer);
         }
         /// <summary>
@@ -45,21 +46,25 @@ namespace Mahjong.Model.Cpu
                 throw new ArgumentNullException(nameof(counts), "counts が null です");
             }
 
+            // counts を変更しないようにコピーを作る
             var working = (int[])counts.Clone();
+            // 現在のシャンテン数を計算する
             var baseShanten = ShantenCalculator.CalculateStandardFromCounts(working, meldCount);
+            // 有効牌の種類数を数える
             var ukeireKinds = 0;
 
             for (var kindIndex = 0; kindIndex < TileKind.KIND_COUNT; kindIndex++)
             {
+                // 3人麻雀で存在しない種類（萬子2〜8）は候補から除外する
                 if (isThreePlayer && IsUnavailableInThreePlayer(kindIndex))
                 {
                     continue;
                 }
-
+                // 1枚増やしてシャンテン数を計算する
                 working[kindIndex]++;
                 var shantenAfterDraw = ShantenCalculator.CalculateStandardFromCounts(working, meldCount);
                 working[kindIndex]--;
-
+                // シャンテン数が減った場合は有効牌の種類数をカウントする
                 if (shantenAfterDraw < baseShanten)
                 {
                     ukeireKinds++;
@@ -78,6 +83,7 @@ namespace Mahjong.Model.Cpu
         /// </summary>
         private static bool IsUnavailableInThreePlayer(int kindIndex)
         {
+            // 萬子2〜8の種類番号は、萬子のオフセット + 1 から + 7 の範囲
             return kindIndex >= TileKind.MANZU_OFFSET + 1 && kindIndex <= TileKind.MANZU_OFFSET + 7;
         }
     }
