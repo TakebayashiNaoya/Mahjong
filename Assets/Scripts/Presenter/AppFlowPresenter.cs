@@ -59,6 +59,10 @@ namespace Mahjong.Presenter
         /// 設定画面で選択中の北抜き使用有無（三人麻雀のみ意味を持つ）
         /// </summary>
         public ReactiveProperty<bool> SettingsUseKitaNuki { get; } = new(false);
+        /// <summary>
+        /// 設定画面で選択中のカオス麻雀ルール使用有無（仕様書16章）
+        /// </summary>
+        public ReactiveProperty<bool> SettingsUseChaosRules { get; } = new(false);
 
 
         // ========================================
@@ -103,7 +107,8 @@ namespace Mahjong.Presenter
                 await _settingsConfirmSource.Task.AttachExternalCancellation(ct);
 
                 var settings = GameSettings.CreateDefault(
-                    playerCount, ToModelGameLength(gameLength), SettingsUseRedDora.Value, SettingsUseKitaNuki.Value);
+                    playerCount, ToModelGameLength(gameLength), SettingsUseRedDora.Value, SettingsUseKitaNuki.Value,
+                    SettingsUseChaosRules.Value);
 
                 CurrentScreen.Value = AppScreen.InGame;
 
@@ -186,6 +191,13 @@ namespace Mahjong.Presenter
         public void SetSettingsUseKitaNuki(bool useKitaNuki)
         {
             SettingsUseKitaNuki.Value = useKitaNuki;
+        }
+        /// <summary>
+        /// 設定画面のカオス麻雀ルール使用有無を受け取る
+        /// </summary>
+        public void SetSettingsUseChaosRules(bool useChaosRules)
+        {
+            SettingsUseChaosRules.Value = useChaosRules;
         }
         /// <summary>
         /// 設定画面の確定（対局開始）ボタンが押されたことを受け取る

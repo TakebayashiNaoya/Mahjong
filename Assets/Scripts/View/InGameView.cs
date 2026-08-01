@@ -39,8 +39,17 @@ namespace Mahjong.View
         private const int BUTTON_FONT_SIZE = 16;
         /// <summary>
         /// ボタンパネルの高さ
+        /// カオス麻雀の取得元選択では候補が20件を超えることがあるため、3行ぶんの高さを確保する
         /// </summary>
-        private const float BUTTON_PANEL_HEIGHT = 64.0f;
+        private const float BUTTON_PANEL_HEIGHT = 152.0f;
+        /// <summary>
+        /// 選択肢ボタン1つの大きさ
+        /// </summary>
+        private static readonly Vector2 ButtonCellSize = new(112.0f, 40.0f);
+        /// <summary>
+        /// 選択肢ボタン同士の間隔
+        /// </summary>
+        private static readonly Vector2 ButtonSpacing = new(8.0f, 6.0f);
         /// <summary>
         /// 手牌アイコンパネルの高さ
         /// </summary>
@@ -120,6 +129,7 @@ namespace Mahjong.View
             // 購読時点では作り直しの予約だけを行い、実際の生成・破棄はLateUpdateにまとめる
             _presenter.Human.IsPendingRiichiChoice.Subscribe(_ => _isButtonRowDirty = true).AddTo(this);
             _presenter.Human.PendingCallChoices.Subscribe(_ => _isButtonRowDirty = true).AddTo(this);
+            _presenter.Human.PendingChaosDrawChoices.Subscribe(_ => _isButtonRowDirty = true).AddTo(this);
             _presenter.Human.PendingDiscardChoices.Subscribe(_ => _isHandRowDirty = true).AddTo(this);
             _presenter.HumanHand.Subscribe(_ => _isHandRowDirty = true).AddTo(this);
         }
@@ -153,11 +163,23 @@ namespace Mahjong.View
         // ========================================
         /// <summary>
         /// 選択肢ボタンを、現在の待ち状態から作り直す
-        /// リーチ確認と鳴き選択が同時に発生することはないため、リーチ確認を優先して表示する
+        /// 取得元選択・リーチ確認・鳴き選択が同時に発生することはないため、見つかった順に1種類だけ表示する
         /// </summary>
         private void RefreshButtonRow()
         {
             ClearButtons();
+
+            var chaosDrawChoices = _presenter.Human.PendingChaosDrawChoices.Value;
+
+            if (chaosDrawChoices != null)
+            {
+                foreach (var choice in chaosDrawChoices)
+                {
+                    CreateButton(choice.Label, () => _presenter.Human.SubmitChaosDraw(choice));
+                }
+
+                return;
+            }
 
             if (_presenter.Human.IsPendingRiichiChoice.Value)
             {
@@ -361,10 +383,12 @@ namespace Mahjong.View
         }
         /// <summary>
         /// 手牌パネルのすぐ上に、選択肢ボタンを並べるパネルを組み立てる
+        /// 横1行に並べるとカオス麻雀の取得元選択が画面幅に収まらないため、
+        /// 幅が尽きたら次の行へ折り返す GridLayoutGroup を使う
         /// </summary>
         private void BuildButtonPanel(Transform canvasTransform)
         {
-            var panelGameObject = new GameObject("ButtonPanel", typeof(RectTransform), typeof(HorizontalLayoutGroup));
+            var panelGameObject = new GameObject("ButtonPanel", typeof(RectTransform), typeof(GridLayoutGroup));
             panelGameObject.transform.SetParent(canvasTransform, false);
 
             _buttonPanel = panelGameObject.GetComponent<RectTransform>();
@@ -374,12 +398,14 @@ namespace Mahjong.View
             _buttonPanel.sizeDelta = new Vector2(0.0f, BUTTON_PANEL_HEIGHT);
             _buttonPanel.anchoredPosition = new Vector2(0.0f, HAND_PANEL_HEIGHT + 16.0f);
 
-            var layout = panelGameObject.GetComponent<HorizontalLayoutGroup>();
-            layout.spacing = 8.0f;
+            var layout = panelGameObject.GetComponent<GridLayoutGroup>();
+            layout.cellSize = ButtonCellSize;
+            layout.spacing = ButtonSpacing;
             layout.padding = new RectOffset(8, 8, 8, 8);
-            layout.childForceExpandWidth = false;
-            layout.childForceExpandHeight = false;
-            layout.childAlignment = TextAnchor.MiddleCenter;
+            layout.startCorner = GridLayoutGroup.Corner.UpperLeft;
+            layout.startAxis = GridLayoutGroup.Axis.Horizontal;
+            layout.childAlignment = TextAnchor.UpperCenter;
+            layout.constraint = GridLayoutGroup.Constraint.Flexible;
         }
         /// <summary>
         /// 画面最下部に、手牌アイコンを並べるパネルを組み立てる
@@ -406,15 +432,12 @@ namespace Mahjong.View
         /// </summary>
         private void CreateButton(string label, Action onClick)
         {
-            var buttonGameObject = new GameObject($"Button_{label}", typeof(Image), typeof(Button), typeof(LayoutElement));
+            // 大きさは GridLayoutGroup が cellSize で決めるため、LayoutElement は付けない
+            var buttonGameObject = new GameObject($"Button_{label}", typeof(Image), typeof(Button));
             buttonGameObject.transform.SetParent(_buttonPanel, false);
 
             var image = buttonGameObject.GetComponent<Image>();
             image.color = ButtonColor;
-
-            var layoutElement = buttonGameObject.GetComponent<LayoutElement>();
-            layoutElement.minWidth = 90.0f;
-            layoutElement.minHeight = BUTTON_PANEL_HEIGHT - 16.0f;
 
             var button = buttonGameObject.GetComponent<Button>();
             button.onClick.AddListener(() => onClick());

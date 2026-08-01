@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using Mahjong.Model.Cpu;
@@ -33,6 +34,17 @@ namespace Mahjong.Presenter
         // ========================================
         // パブリックメソッド
         // ========================================
+        /// <summary>
+        /// CPUはカオス操作を行わず、常に山からツモる（仕様書16.9）
+        /// 山が尽きている手番では GamePresenter が先に荒牌平局を宣言するため、山の選択肢は必ず含まれる
+        /// </summary>
+        public UniTask<ChaosDrawOption> ChooseChaosDrawAsync(
+            Round round, int playerIndex, IReadOnlyList<ChaosDrawOption> options, CancellationToken ct)
+        {
+            var wallOption = options.FirstOrDefault(o => o.Source == ChaosDrawSource.Wall);
+            return UniTask.FromResult(wallOption ?? options[0]);
+        }
+
         public UniTask<bool> ShouldDeclareRiichiAsync(Round round, int playerIndex, CancellationToken ct)
         {
             return UniTask.FromResult(CpuStrategy.ShouldDeclareRiichi(round, playerIndex, DIFFICULTY));

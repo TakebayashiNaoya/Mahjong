@@ -13,6 +13,13 @@ namespace Mahjong.Presenter
     public interface IPlayerController
     {
         /// <summary>
+        /// カオス麻雀ルールで、この手番にどこから牌を取るかを選ぶ（仕様書16.3）
+        /// カオスルールが無効の局では呼ばれない
+        /// </summary>
+        /// <param name="options">Round が列挙した取得元。必ず1件以上ある</param>
+        UniTask<ChaosDrawOption> ChooseChaosDrawAsync(
+            Round round, int playerIndex, IReadOnlyList<ChaosDrawOption> options, CancellationToken ct);
+        /// <summary>
         /// リーチを宣言するかどうかを判断する
         /// </summary>
         UniTask<bool> ShouldDeclareRiichiAsync(Round round, int playerIndex, CancellationToken ct);

@@ -187,7 +187,15 @@ namespace Mahjong.Presenter
                         return _round.DeclareExhaustiveDraw();
                     }
 
-                    _round.DrawTile();
+                    if (_round.Settings.UseChaosRules)
+                    {
+                        await ProcessChaosDrawPhaseAsync(ct);
+                    }
+                    else
+                    {
+                        _round.DrawTile();
+                    }
+
                     Refresh();
                     await DelayAsync(ct);
                     continue;
@@ -220,6 +228,43 @@ namespace Mahjong.Presenter
                     continue;
                 }
             }
+        }
+        /// <summary>
+        /// カオス麻雀ルールで、現在のプレイヤーがどこから牌を取るかを決めて実行する（仕様書16.3）
+        /// 自分の副露を戻した場合は打牌せずに手番が終わり、Round が次のプレイヤーのツモ待ちに進めるため、
+        /// ここでは結果のフェーズを見ずに呼び出し元のループへ戻す
+        /// </summary>
+        private async UniTask ProcessChaosDrawPhaseAsync(CancellationToken ct)
+        {
+            var playerIndex = _round.CurrentPlayerIndex;
+            var options = _round.GetChaosDrawOptions();
+            var option = await GetController(playerIndex).ChooseChaosDrawAsync(_round, playerIndex, options, ct);
+            var drawnTile = _round.ExecuteChaosDraw(option);
+
+            AppendLog(DescribeChaosDraw(playerIndex, option, drawnTile));
+        }
+        /// <summary>
+        /// カオス麻雀の取得操作を1行で要約する
+        /// </summary>
+        private static string DescribeChaosDraw(int playerIndex, ChaosDrawOption option, Tile drawnTile)
+        {
+            var sourceLabel = option.Source switch
+            {
+                ChaosDrawSource.Wall => "山",
+                ChaosDrawSource.DiscardPile => $"P{option.TargetPlayerIndex}の河",
+                ChaosDrawSource.OpponentHand => $"P{option.TargetPlayerIndex}の手牌",
+                ChaosDrawSource.OpponentMeld => $"P{option.TargetPlayerIndex}の副露",
+                ChaosDrawSource.OwnMeld => "自分の副露",
+                _ => option.Source.ToString(),
+            };
+
+            // チー・ポンを戻した手番は打牌が発生しないため、ツモ牌が無いことを明示する
+            if (drawnTile == null)
+            {
+                return $"P{playerIndex} {sourceLabel}を手牌に戻す（打牌なし）";
+            }
+
+            return $"P{playerIndex} {sourceLabel}から取得";
         }
         /// <summary>
         /// 現在のプレイヤーのツモ番の判断（ツモ和了・九種九牌・北抜き・リーチ・打牌）を行う

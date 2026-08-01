@@ -156,6 +156,7 @@ namespace Mahjong.View
             _flow.SettingsDifficulty.Subscribe(_ => _isSettingsPanelDirty = true).AddTo(this);
             _flow.SettingsUseRedDora.Subscribe(_ => _isSettingsPanelDirty = true).AddTo(this);
             _flow.SettingsUseKitaNuki.Subscribe(_ => _isSettingsPanelDirty = true).AddTo(this);
+            _flow.SettingsUseChaosRules.Subscribe(_ => _isSettingsPanelDirty = true).AddTo(this);
         }
 
         private void LateUpdate()
@@ -240,6 +241,11 @@ namespace Mahjong.View
                     ("あり", () => _flow.SetSettingsUseKitaNuki(true), _flow.SettingsUseKitaNuki.Value),
                     ("なし", () => _flow.SetSettingsUseKitaNuki(false), !_flow.SettingsUseKitaNuki.Value));
             }
+
+            CreateSettingsRow(
+                "カオス麻雀",
+                ("あり", () => _flow.SetSettingsUseChaosRules(true), _flow.SettingsUseChaosRules.Value),
+                ("なし", () => _flow.SetSettingsUseChaosRules(false), !_flow.SettingsUseChaosRules.Value));
 
             CreateButton(_settingsContent, "対局開始", () => _flow.ConfirmSettings());
         }
