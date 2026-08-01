@@ -446,25 +446,26 @@ namespace Mahjong.Presenter
         /// <summary>
         /// 和了時の手牌（門前牌＋和了牌）を組み立てる
         /// ロンの和了牌はまだ手牌に含まれていないため、放銃者の最後の捨て牌から補う
+        /// 和了牌を単に末尾へ追加すると手牌の並び順が崩れて見えるため、追加後に牌全体を並べ替える
         /// </summary>
         private IReadOnlyList<TileView> BuildWinningHandTiles(PlayerState winner, WinOutcome outcome, bool isTsumo)
         {
-            var tiles = winner.Hand.Tiles.Select(TileView.FromModel).ToList();
+            var tiles = new List<Tile>(winner.Hand.Tiles);
 
             if (isTsumo)
             {
                 if (winner.Hand.DrawnTile != null)
                 {
-                    tiles.Add(TileView.FromModel(winner.Hand.DrawnTile));
+                    tiles.Add(winner.Hand.DrawnTile);
                 }
             }
             else
             {
                 var discarder = _round.Players[outcome.DiscarderIndex.Value];
-                tiles.Add(TileView.FromModel(discarder.Discards[^1]));
+                tiles.Add(discarder.Discards[^1]);
             }
 
-            return tiles;
+            return SortTiles(tiles).Select(TileView.FromModel).ToList();
         }
         /// <summary>
         /// 点数を表す表示文字列を組み立てる（例: "親ロン 11600点", "子ツモ 2000/3900点"）
@@ -620,14 +621,20 @@ namespace Mahjong.Presenter
                 return meld.Tiles.Select(TileView.FromModel).ToList();
             }
 
-            var sorted = tiles
+            var sorted = SortTiles(tiles);
+            sorted.Insert(rotatedTileIndex, meld.StolenTile);
+            return sorted.Select(TileView.FromModel).ToList();
+        }
+        /// <summary>
+        /// 牌をスーツ→数字→赤ドラの順に並べ替える
+        /// </summary>
+        private static List<Tile> SortTiles(IEnumerable<Tile> tiles)
+        {
+            return tiles
                 .OrderBy(tile => tile.Suit)
                 .ThenBy(tile => tile.Suit == TileSuit.Jihai ? (int)tile.Id : tile.Number)
                 .ThenBy(tile => tile.IsRed ? 1 : 0)
                 .ToList();
-
-            sorted.Insert(rotatedTileIndex, meld.StolenTile);
-            return sorted.Select(TileView.FromModel).ToList();
         }
         /// <summary>
         /// 鳴いた相手から、横向きに置く牌のインデックスを求める
