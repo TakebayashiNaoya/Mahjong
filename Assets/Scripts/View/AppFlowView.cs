@@ -92,6 +92,14 @@ namespace Mahjong.View
         /// ゲーム終了画面の内容を積み上げるコンテナ
         /// </summary>
         private Transform _gameOverContent;
+        /// <summary>
+        /// 次のLateUpdateで設定画面を作り直すかどうか
+        /// </summary>
+        private bool _isSettingsPanelDirty;
+        /// <summary>
+        /// 次のLateUpdateでゲーム終了画面を作り直すかどうか
+        /// </summary>
+        private bool _isGameOverPanelDirty;
 
 
         // ========================================
@@ -139,11 +147,30 @@ namespace Mahjong.View
         {
             _flow.CurrentScreen.Subscribe(OnScreenChanged).AddTo(this);
             _flow.ActiveGame.Subscribe(OnActiveGameChanged).AddTo(this);
-            _flow.FinalSummary.Subscribe(_ => RefreshGameOverPanel()).AddTo(this);
-            _flow.SelectedPlayerCount.Subscribe(_ => RefreshSettingsPanel()).AddTo(this);
-            _flow.SettingsDifficulty.Subscribe(_ => RefreshSettingsPanel()).AddTo(this);
-            _flow.SettingsUseRedDora.Subscribe(_ => RefreshSettingsPanel()).AddTo(this);
-            _flow.SettingsUseKitaNuki.Subscribe(_ => RefreshSettingsPanel()).AddTo(this);
+
+            // 購読時点では作り直しの予約だけを行い、実際の生成・破棄はLateUpdateにまとめる
+            // （ボタンのクリックはUpdateで配送され、そのハンドラ内でReactivePropertyの更新まで同期的に走るため、
+            // その場で作り直すとクリックされたボタン自身をイベント配送中に破棄することになる）
+            _flow.FinalSummary.Subscribe(_ => _isGameOverPanelDirty = true).AddTo(this);
+            _flow.SelectedPlayerCount.Subscribe(_ => _isSettingsPanelDirty = true).AddTo(this);
+            _flow.SettingsDifficulty.Subscribe(_ => _isSettingsPanelDirty = true).AddTo(this);
+            _flow.SettingsUseRedDora.Subscribe(_ => _isSettingsPanelDirty = true).AddTo(this);
+            _flow.SettingsUseKitaNuki.Subscribe(_ => _isSettingsPanelDirty = true).AddTo(this);
+        }
+
+        private void LateUpdate()
+        {
+            if (_isSettingsPanelDirty)
+            {
+                _isSettingsPanelDirty = false;
+                RefreshSettingsPanel();
+            }
+
+            if (_isGameOverPanelDirty)
+            {
+                _isGameOverPanelDirty = false;
+                RefreshGameOverPanel();
+            }
         }
 
 

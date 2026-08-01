@@ -91,16 +91,16 @@ namespace Mahjong.Presenter
             {
                 CurrentScreen.Value = AppScreen.Title;
                 _titleStartSource = new UniTaskCompletionSource();
-                await _titleStartSource.Task;
+                await _titleStartSource.Task.AttachExternalCancellation(ct);
 
                 CurrentScreen.Value = AppScreen.ModeSelect;
                 _modeSelectionSource = new UniTaskCompletionSource<(int, GameLengthChoice)>();
-                var (playerCount, gameLength) = await _modeSelectionSource.Task;
+                var (playerCount, gameLength) = await _modeSelectionSource.Task.AttachExternalCancellation(ct);
                 SelectedPlayerCount.Value = playerCount;
 
                 CurrentScreen.Value = AppScreen.Settings;
                 _settingsConfirmSource = new UniTaskCompletionSource();
-                await _settingsConfirmSource.Task;
+                await _settingsConfirmSource.Task.AttachExternalCancellation(ct);
 
                 var settings = GameSettings.CreateDefault(
                     playerCount, ToModelGameLength(gameLength), SettingsUseRedDora.Value, SettingsUseKitaNuki.Value);
@@ -120,7 +120,7 @@ namespace Mahjong.Presenter
 
                 CurrentScreen.Value = AppScreen.GameOver;
                 _gameOverAckSource = new UniTaskCompletionSource();
-                await _gameOverAckSource.Task;
+                await _gameOverAckSource.Task.AttachExternalCancellation(ct);
             }
         }
         /// <summary>
