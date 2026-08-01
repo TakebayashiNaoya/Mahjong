@@ -14,8 +14,9 @@ namespace Mahjong.Model.Game
     /// 1局（配牌から和了・流局まで）の進行を担う
     /// 実時間の待ち（CPU思考・入力待ち）は扱わない同期メソッド群として実装し、
     /// 呼び出し順の制御・待ち時間の管理は将来のPresenter層の責務とする
+    /// カオス麻雀ルール（仕様書16章）専用の処理は Round.Chaos.cs に分けている
     /// </summary>
-    public class Round
+    public partial class Round
     {
         // ========================================
         // 定数
@@ -653,7 +654,8 @@ namespace Mahjong.Model.Game
 
                 // リーチ後は手牌を変えられないため、他家の捨て牌に対してはロンしか宣言できない
                 // （リーチ後に認められる暗槓は自分のツモ番の宣言であり、ここでは扱わない）
-                if (player.HandState.IsRiichi)
+                // カオス麻雀ルールではリーチを撤回して鳴けるため、この制限を課さない（仕様書16.6）
+                if (player.HandState.IsRiichi && !Settings.UseChaosRules)
                 {
                     continue;
                 }
@@ -956,6 +958,13 @@ namespace Mahjong.Model.Game
 
             var tiles = new List<Tile>(declaration.SelectedTiles) { discardedTile };
             player.Hand.AddMeld(new Meld(meldType, tiles, discardedTile, fromWind));
+
+            // カオス麻雀ルールでは、リーチ中のプレイヤーが鳴いた時点でリーチを撤回したものとして扱う
+            // 供託した1000点は場に残るため、RiichiStickCount と持ち点には手を触れない（仕様書16.6）
+            if (player.HandState.IsRiichi)
+            {
+                player.HandState.CancelRiichi();
+            }
         }
         /// <summary>
         /// チーの候補パターン（0〜3通り）を列挙する

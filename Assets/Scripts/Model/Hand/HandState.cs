@@ -127,6 +127,19 @@ namespace Mahjong.Model.Hands
             IppatsuAvailable = false;
         }
         /// <summary>
+        /// リーチを撤回する（カオス麻雀ルール専用。仕様書16.6）
+        /// リーチ中のプレイヤーが鳴いた時点で呼ぶ
+        /// 役「リーチ」・一発・裏ドラはいずれも IsRiichi を参照して判定されるため、
+        /// ここで状態を落とすだけで和了時の計算から自動的に外れる
+        /// 供託した1000点は場に残るため、ここでは持ち点に手を触れない
+        /// </summary>
+        public void CancelRiichi()
+        {
+            IsRiichi = false;
+            IppatsuAvailable = false;
+            RiichiTurnIndex = -1;
+        }
+        /// <summary>
         /// 局開始時に状態をリセットする
         /// </summary>
         public void Reset()

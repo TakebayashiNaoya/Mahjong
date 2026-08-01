@@ -353,6 +353,70 @@ namespace Mahjong.Model.Hands
             _tiles.AddRange(tiles);
             Sort();
         }
+        /// <summary>
+        /// 副露を取り消し、構成牌をすべて手牌に戻す（カオス麻雀ルール専用）
+        /// 戻したあとの手牌枚数は呼び出し元が調整する
+        /// （チー・ポンは3枚戻るため副露1組ぶんの枠とちょうど釣り合い、カンは4枚戻るため1枚多くなる）
+        /// </summary>
+        /// <param name="meld">取り消す副露</param>
+        /// <returns>手牌に戻した牌</returns>
+        /// <exception cref="ArgumentNullException">meld が null の場合</exception>
+        /// <exception cref="InvalidOperationException">meld がこの手牌の副露でない場合</exception>
+        public IReadOnlyList<Tile> RemoveMeld(Meld meld)
+        {
+            if (meld == null)
+            {
+                throw new ArgumentNullException(nameof(meld), "meld が null です");
+            }
+
+            var meldIndex = _melds.FindIndex(m => ReferenceEquals(m, meld));
+
+            if (meldIndex < 0)
+            {
+                throw new InvalidOperationException($"この手牌の副露ではありません: {meld}");
+            }
+
+            var returnedTiles = new List<Tile>(meld.Tiles);
+            _melds.RemoveAt(meldIndex);
+            _tiles.AddRange(returnedTiles);
+            Sort();
+
+            return returnedTiles;
+        }
+        /// <summary>
+        /// 手牌から指定位置の牌を抜き取る（カオス麻雀ルール専用）
+        /// 他家に手牌を奪われる側の処理に使う。ツモ牌は対象に含まない
+        /// </summary>
+        /// <param name="index">Tiles 上の位置</param>
+        /// <returns>抜き取った牌</returns>
+        /// <exception cref="ArgumentOutOfRangeException">index が範囲外の場合</exception>
+        public Tile TakeTileAt(int index)
+        {
+            if (index < 0 || index >= _tiles.Count)
+            {
+                throw new ArgumentOutOfRangeException(nameof(index), $"index が範囲外です: {index}");
+            }
+
+            var tile = _tiles[index];
+            _tiles.RemoveAt(index);
+            return tile;
+        }
+        /// <summary>
+        /// 牌を手牌に加える（カオス麻雀ルール専用）
+        /// 奪われた側が山から補充する処理に使う。ツモ牌ではなく通常の手牌として加える
+        /// </summary>
+        /// <param name="tile">加える牌</param>
+        /// <exception cref="ArgumentNullException">tile が null の場合</exception>
+        public void AddTile(Tile tile)
+        {
+            if (tile == null)
+            {
+                throw new ArgumentNullException(nameof(tile), "tile が null です");
+            }
+
+            _tiles.Add(tile);
+            Sort();
+        }
 
 
         // ========================================

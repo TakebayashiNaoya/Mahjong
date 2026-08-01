@@ -43,6 +43,12 @@ namespace Mahjong.Model.Game
         /// 飛び（持ち点0点以下）でゲームを終了させるかどうか
         /// </summary>
         public bool EnableTobi { get; }
+        /// <summary>
+        /// カオス麻雀ルール（仕様書16章）を使用するかどうか
+        /// 有効時は山以外からのツモ・副露の巻き戻し・リーチの撤回が可能になる
+        /// 役・符・点数の計算は通常ルールのまま変わらない
+        /// </summary>
+        public bool UseChaosRules { get; }
 
 
         // ========================================
@@ -60,7 +66,8 @@ namespace Mahjong.Model.Game
             bool useRedDora = true,
             bool useKitaNuki = false,
             bool allowChiInThreePlayer = false,
-            bool enableTobi = true)
+            bool enableTobi = true,
+            bool useChaosRules = false)
         {
             if (playerCount != 3 && playerCount != 4)
             {
@@ -75,6 +82,7 @@ namespace Mahjong.Model.Game
             UseKitaNuki = useKitaNuki && playerCount == 3;
             AllowChiInThreePlayer = allowChiInThreePlayer;
             EnableTobi = enableTobi;
+            UseChaosRules = useChaosRules;
         }
 
 
@@ -89,12 +97,17 @@ namespace Mahjong.Model.Game
         /// <param name="gameLength">東風戦か半荘戦か</param>
         /// <param name="useRedDora">赤ドラを使用するかどうか</param>
         /// <param name="useKitaNuki">北抜きを使用するかどうか（三人麻雀以外では無視される）</param>
+        /// <param name="useChaosRules">カオス麻雀ルールを使用するかどうか</param>
         public static GameSettings CreateDefault(
-            int playerCount, GameLengthType gameLength, bool useRedDora = true, bool useKitaNuki = false)
+            int playerCount, GameLengthType gameLength, bool useRedDora = true, bool useKitaNuki = false,
+            bool useChaosRules = false)
         {
             var initialScore = playerCount == 3 ? 35000 : 25000;
             var returnScore = playerCount == 3 ? 40000 : 30000;
-            return new GameSettings(playerCount, gameLength, initialScore, returnScore, useRedDora, useKitaNuki);
+
+            return new GameSettings(
+                playerCount, gameLength, initialScore, returnScore, useRedDora, useKitaNuki,
+                allowChiInThreePlayer: false, enableTobi: true, useChaosRules: useChaosRules);
         }
     }
 }

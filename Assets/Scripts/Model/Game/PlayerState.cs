@@ -108,6 +108,25 @@ namespace Mahjong.Model.Game
             _discards.Add(tile);
         }
         /// <summary>
+        /// 河から指定位置の捨て牌を抜き取る（カオス麻雀ルール専用。仕様書16.8）
+        /// フリテン判定に使う捨て牌履歴（HandState.DiscardedTiles）からは削除しない
+        /// 卓上から牌が持ち去られても「一度捨てた」事実は消えないため、フリテンは継続する
+        /// </summary>
+        /// <param name="index">河の中での位置</param>
+        /// <returns>抜き取った牌</returns>
+        /// <exception cref="ArgumentOutOfRangeException">index が範囲外の場合</exception>
+        public Tile RemoveDiscardAt(int index)
+        {
+            if (index < 0 || index >= _discards.Count)
+            {
+                throw new ArgumentOutOfRangeException(nameof(index), $"index が範囲外です: {index}");
+            }
+
+            var tile = _discards[index];
+            _discards.RemoveAt(index);
+            return tile;
+        }
+        /// <summary>
         /// 北抜きの枚数を1増やす
         /// </summary>
         public void AddKita()
